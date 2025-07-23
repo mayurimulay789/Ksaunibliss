@@ -11,27 +11,24 @@ import {
   User,
   Heart,
 } from "lucide-react";
+import axios from "axios";
 import { logout } from "../store/slices/authSlice";
 import { fetchCategories } from "../store/slices/categorySlice";
-import axios from "axios";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hoveredMenu, setHoveredMenu] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [productPreviews, setProductPreviews] = useState({}); // cache
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [productPreviews, setProductPreviews] = useState({});
 
-  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const { user, token } = useSelector((state) => state.auth || {});
   const { categories } = useSelector((state) => state.categories || {});
-  const { items: cartItems } = useSelector(
-    (state) => state.cart || { items: [] }
-  );
-  const { items: wishlistItems } = useSelector(
-    (state) => state.wishlist || { items: [] }
-  );
+  const { items: cartItems } = useSelector((state) => state.cart || { items: [] });
+  const { items: wishlistItems } = useSelector((state) => state.wishlist || { items: [] });
 
   useEffect(() => {
     dispatch(fetchCategories({ showOnHomepage: true }));
@@ -129,6 +126,12 @@ const Navbar = () => {
     </div>
   );
 
+  const handleLogout = () => {
+    dispatch(logout());
+    setShowUserMenu(false);
+    navigate("/");
+  };
+
   return (
     <motion.nav
       initial={{ y: -100 }}
@@ -137,7 +140,7 @@ const Navbar = () => {
       className="sticky top-0 z-50 bg-white shadow-md"
     >
       <div className="container mx-auto px-4">
-        {/* Top */}
+        {/* Top Row */}
         <div className="flex items-center justify-between py-4">
           <div
             onClick={() => navigate("/")}
@@ -145,6 +148,8 @@ const Navbar = () => {
           >
             KsauniBliss
           </div>
+
+          {/* Search */}
           <div className="hidden md:flex flex-1 justify-center mx-8 max-w-md">
             <form
               onSubmit={(e) => {
@@ -163,7 +168,10 @@ const Navbar = () => {
               />
             </form>
           </div>
+
+          {/* Icons */}
           <div className="flex items-center space-x-4">
+            {/* Wishlist */}
             <div
               onClick={() => navigate("/wishlist")}
               className="relative hidden md:flex items-center space-x-1 text-gray-700 hover:text-pink-600 cursor-pointer"
@@ -176,6 +184,8 @@ const Navbar = () => {
                 </span>
               )}
             </div>
+
+            {/* Cart */}
             <div
               onClick={() => navigate("/cart")}
               className="relative flex items-center space-x-1 text-gray-700 hover:text-pink-600 cursor-pointer"
@@ -188,37 +198,90 @@ const Navbar = () => {
                 </span>
               )}
             </div>
-            {token ? (
-              <div
-                onClick={() => navigate("/profile")}
-                className="hidden md:flex items-center space-x-1 text-gray-700 hover:text-pink-600 cursor-pointer"
+
+            {/* Profile / Login */}
+            <div className="relative hidden md:flex items-center text-gray-700 hover:text-pink-600 cursor-pointer">
+              <User className="w-5 h-5 mr-1" />
+              <span
+                onClick={() => {
+                  if (!token) navigate("/login");
+                  else setShowUserMenu(!showUserMenu);
+                }}
+                className="text-sm"
               >
-                <User className="w-5 h-5" />
-                <span className="text-sm">{user?.name || "Profile"}</span>
-              </div>
-            ) : (
-              <div
-                onClick={() => navigate("/login")}
-                className="hidden md:flex items-center space-x-1 text-gray-700 hover:text-pink-600 cursor-pointer"
-              >
-                <User className="w-5 h-5" />
-                <span className="text-sm">Login</span>
-              </div>
-            )}
+                {token ? user?.name || "Profile" : "Login"}
+              </span>
+              <ChevronDown className="w-4 h-4 ml-1" />
+              <AnimatePresence>
+                {showUserMenu && token && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-10 w-48 py-2 bg-white border rounded shadow-lg z-50"
+                  >
+                    <div
+                      onClick={() => {
+                        navigate("/profile");
+                        setShowUserMenu(false);
+                      }}
+                      className="px-4 py-2 text-sm hover:bg-pink-50"
+                    >
+                      My Profile
+                    </div>
+                    <div
+                      onClick={() => {
+                        navigate("/orders");
+                        setShowUserMenu(false);
+                      }}
+                      className="px-4 py-2 text-sm hover:bg-pink-50"
+                    >
+                      My Orders
+                    </div>
+                    {user?.role === "admin" && (
+                      <div
+                        onClick={() => {
+                          navigate("/admin");
+                          setShowUserMenu(false);
+                        }}
+                        className="px-4 py-2 text-sm hover:bg-pink-50"
+                      >
+                        Admin Dashboard
+                      </div>
+                    )}
+                    {user?.role === "digitalMarketer" && (
+                      <div
+                        onClick={() => {
+                          navigate("/digitalMarketer");
+                          setShowUserMenu(false);
+                        }}
+                        className="px-4 py-2 text-sm hover:bg-pink-50"
+                      >
+                        Marketer Dashboard
+                      </div>
+                    )}
+                    <div
+                      onClick={handleLogout}
+                      className="px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      Logout
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Mobile Menu */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 md:hidden"
             >
-              {isMenuOpen ? (
-                <X className="w-5 h-5" />
-              ) : (
-                <Menu className="w-5 h-5" />
-              )}
+              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        {/* Main Menu */}
+        {/* Desktop Navigation */}
         <div className="hidden md:flex justify-center space-x-6 border-t py-3">
           {renderDropdown("Men", groupedCategories.Men)}
           {renderDropdown("Women", groupedCategories.Women)}
