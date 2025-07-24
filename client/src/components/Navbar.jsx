@@ -27,8 +27,12 @@ const Navbar = () => {
 
   const { user, token } = useSelector((state) => state.auth || {});
   const { categories } = useSelector((state) => state.categories || {});
-  const { items: cartItems } = useSelector((state) => state.cart || { items: [] });
-  const { items: wishlistItems } = useSelector((state) => state.wishlist || { items: [] });
+  const { items: cartItems } = useSelector(
+    (state) => state.cart || { items: [] }
+  );
+  const { items: wishlistItems } = useSelector(
+    (state) => state.wishlist || { items: [] }
+  );
 
   useEffect(() => {
     dispatch(fetchCategories({ showOnHomepage: true }));
@@ -276,7 +280,11 @@ const Navbar = () => {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 md:hidden"
             >
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {isMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
             </button>
           </div>
         </div>

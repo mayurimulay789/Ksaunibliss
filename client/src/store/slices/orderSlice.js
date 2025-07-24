@@ -1,57 +1,92 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
-import { orderAPI } from "../api/orderAPI"
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { orderAPI } from "../api/orderAPI";
 
 // Async thunks
+
 export const createRazorpayOrder = createAsyncThunk(
   "order/createRazorpayOrder",
   async (orderData, { rejectWithValue }) => {
     try {
-      const response = await orderAPI.createRazorpayOrder(orderData)
-      return response.data
+      const response = await orderAPI.createRazorpayOrder(orderData);
+      return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to create order")
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to create Razorpay order"
+      );
     }
-  },
-)
-
-export const verifyPayment = createAsyncThunk("order/verifyPayment", async (paymentData, { rejectWithValue }) => {
-  try {
-    const response = await orderAPI.verifyPayment(paymentData)
-    return response.data
-  } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Payment verification failed")
   }
-})
+);
+
+export const verifyPayment = createAsyncThunk(
+  "order/verifyPayment",
+  async (paymentData, { rejectWithValue }) => {
+    try {
+      const response = await orderAPI.verifyPayment(paymentData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Payment verification failed"
+      );
+    }
+  }
+);
+
+// ✅ Cash on Delivery order thunk
+export const placeCodOrder = createAsyncThunk(
+  "order/placeCodOrder",
+  async (orderData, { rejectWithValue }) => {
+    try {
+      const response = await orderAPI.placeCodOrder(orderData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to place COD order"
+      );
+    }
+  }
+);
 
 export const fetchUserOrders = createAsyncThunk(
   "order/fetchUserOrders",
   async ({ page = 1, limit = 10 } = {}, { rejectWithValue }) => {
     try {
-      const response = await orderAPI.getUserOrders(page, limit)
-      return response.data
+      const response = await orderAPI.getUserOrders(page, limit);
+      return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to fetch orders")
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch orders"
+      );
     }
-  },
-)
-
-export const fetchOrderDetails = createAsyncThunk("order/fetchOrderDetails", async (orderId, { rejectWithValue }) => {
-  try {
-    const response = await orderAPI.getOrderDetails(orderId)
-    return response.data
-  } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch order details")
   }
-})
+);
 
-export const cancelOrder = createAsyncThunk("order/cancelOrder", async ({ orderId, reason }, { rejectWithValue }) => {
-  try {
-    const response = await orderAPI.cancelOrder(orderId, reason)
-    return response.data
-  } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to cancel order")
+export const fetchOrderDetails = createAsyncThunk(
+  "order/fetchOrderDetails",
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const response = await orderAPI.getOrderDetails(orderId);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch order details"
+      );
+    }
   }
-})
+);
+
+export const cancelOrder = createAsyncThunk(
+  "order/cancelOrder",
+  async ({ orderId, reason }, { rejectWithValue }) => {
+    try {
+      const response = await orderAPI.cancelOrder(orderId, reason);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to cancel order"
+      );
+    }
+  }
+);
 
 const initialState = {
   orders: [],
@@ -77,118 +112,136 @@ const initialState = {
     paymentVerified: false,
     orderCancelled: false,
   },
-}
+};
 
 const orderSlice = createSlice({
   name: "order",
   initialState,
   reducers: {
     clearError: (state) => {
-      state.error = null
+      state.error = null;
     },
     clearSuccess: (state) => {
       state.success = {
         orderCreated: false,
         paymentVerified: false,
         orderCancelled: false,
-      }
+      };
     },
     clearRazorpayOrder: (state) => {
-      state.razorpayOrder = null
-      state.orderSummary = null
+      state.razorpayOrder = null;
+      state.orderSummary = null;
     },
     setCurrentOrder: (state, action) => {
-      state.currentOrder = action.payload
+      state.currentOrder = action.payload;
     },
   },
   extraReducers: (builder) => {
     builder
-      // Create Razorpay Order
+      // Razorpay
       .addCase(createRazorpayOrder.pending, (state) => {
-        state.loading.creating = true
-        state.error = null
+        state.loading.creating = true;
+        state.error = null;
       })
       .addCase(createRazorpayOrder.fulfilled, (state, action) => {
-        state.loading.creating = false
-        state.razorpayOrder = action.payload.razorpayOrder
-        state.orderSummary = action.payload.orderSummary
-        state.success.orderCreated = true
+        state.loading.creating = false;
+        state.razorpayOrder = action.payload.razorpayOrder;
+        state.orderSummary = action.payload.orderSummary;
+        state.success.orderCreated = true;
       })
       .addCase(createRazorpayOrder.rejected, (state, action) => {
-        state.loading.creating = false
-        state.error = action.payload
+        state.loading.creating = false;
+        state.error = action.payload;
       })
 
-      // Verify Payment
+      // Verify Razorpay
       .addCase(verifyPayment.pending, (state) => {
-        state.loading.verifying = true
-        state.error = null
+        state.loading.verifying = true;
+        state.error = null;
       })
       .addCase(verifyPayment.fulfilled, (state, action) => {
-        state.loading.verifying = false
-        state.currentOrder = action.payload.order
-        state.success.paymentVerified = true
-        state.razorpayOrder = null
-        state.orderSummary = null
+        state.loading.verifying = false;
+        state.currentOrder = action.payload.order;
+        state.success.paymentVerified = true;
+        state.razorpayOrder = null;
+        state.orderSummary = null;
       })
       .addCase(verifyPayment.rejected, (state, action) => {
-        state.loading.verifying = false
-        state.error = action.payload
+        state.loading.verifying = false;
+        state.error = action.payload;
       })
 
-      // Fetch User Orders
+      // ✅ COD order
+      .addCase(placeCodOrder.pending, (state) => {
+        state.loading.creating = true;
+        state.error = null;
+      })
+      .addCase(placeCodOrder.fulfilled, (state, action) => {
+        state.loading.creating = false;
+        state.currentOrder = action.payload.order;
+        state.success.orderCreated = true;
+      })
+      .addCase(placeCodOrder.rejected, (state, action) => {
+        state.loading.creating = false;
+        state.error = action.payload;
+      })
+
+      // User orders
       .addCase(fetchUserOrders.pending, (state) => {
-        state.loading.fetching = true
-        state.error = null
+        state.loading.fetching = true;
+        state.error = null;
       })
       .addCase(fetchUserOrders.fulfilled, (state, action) => {
-        state.loading.fetching = false
-        state.orders = action.payload.orders
-        state.pagination = action.payload.pagination
+        state.loading.fetching = false;
+        state.orders = action.payload.orders;
+        state.pagination = action.payload.pagination;
       })
       .addCase(fetchUserOrders.rejected, (state, action) => {
-        state.loading.fetching = false
-        state.error = action.payload
+        state.loading.fetching = false;
+        state.error = action.payload;
       })
 
-      // Fetch Order Details
+      // Order details
       .addCase(fetchOrderDetails.pending, (state) => {
-        state.loading.fetching = true
-        state.error = null
+        state.loading.fetching = true;
+        state.error = null;
       })
       .addCase(fetchOrderDetails.fulfilled, (state, action) => {
-        state.loading.fetching = false
-        state.currentOrder = action.payload.order
+        state.loading.fetching = false;
+        state.currentOrder = action.payload.order;
       })
       .addCase(fetchOrderDetails.rejected, (state, action) => {
-        state.loading.fetching = false
-        state.error = action.payload
+        state.loading.fetching = false;
+        state.error = action.payload;
       })
 
-      // Cancel Order
+      // Cancel order
       .addCase(cancelOrder.pending, (state) => {
-        state.loading.cancelling = true
-        state.error = null
+        state.loading.cancelling = true;
+        state.error = null;
       })
       .addCase(cancelOrder.fulfilled, (state, action) => {
-        state.loading.cancelling = false
-        state.success.orderCancelled = true
-        // Update the order in the orders array
-        const index = state.orders.findIndex((order) => order._id === action.payload.order._id)
-        if (index !== -1) {
-          state.orders[index] = action.payload.order
-        }
-        // Update current order if it's the same
-        if (state.currentOrder && state.currentOrder._id === action.payload.order._id) {
-          state.currentOrder = action.payload.order
+        state.loading.cancelling = false;
+        state.success.orderCancelled = true;
+
+        const index = state.orders.findIndex(
+          (order) => order._id === action.payload.order._id
+        );
+        if (index !== -1) state.orders[index] = action.payload.order;
+        if (
+          state.currentOrder &&
+          state.currentOrder._id === action.payload.order._id
+        ) {
+          state.currentOrder = action.payload.order;
         }
       })
       .addCase(cancelOrder.rejected, (state, action) => {
-        state.loading.cancelling = false
-        state.error = action.payload
-      })
+        state.loading.cancelling = false;
+        state.error = action.payload;
+      });
   },
-})
+});
 
-export const { clearError, clearSuccess, clearRazorpayOrder, setCurrentOrder } = orderSlice.actions
-export default orderSlice.reducer
+export const { clearError, clearSuccess, clearRazorpayOrder, setCurrentOrder } =
+  orderSlice.actions;
+export default orderSlice.reducer;
