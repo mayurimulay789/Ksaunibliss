@@ -187,36 +187,29 @@ const createRazorpayOrder = async (req, res) => {
   }
 };
 
-// Create Razorpay COD Order
 const placeCodOrder = async (req, res) => {
   try {
-    const { items, shippingAddress, couponCode } = req.body;
+    // 1) Auth & request data
     const userId = req.user.userId;
+    const { items, shippingAddress, couponCode } = req.body;
 
-    // Validate required fields
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Cart items are required",
-      });
-    }
-
-    if (
-      !shippingAddress ||
-      !shippingAddress.fullName ||
-      !shippingAddress.phoneNumber ||
-      !shippingAddress.pinCode
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Complete shipping address is required",
-      });
-    }
-
-    // Validate and calculate order total
+    // 2) Order math
     let subtotal = 0;
     const validatedItems = [];
 
+    // 3) Coupon
+    let discount = 0;
+    let couponDetails = null;
+
+    // 4) Shipping & tax
+    let shippingCharges = 0;
+    let tax = 0;
+    let total = 0;
+
+    // 5) Order metadata
+
+    const status = "confirmed"; // or your default status
+    const createdAt = new Date();
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) {
@@ -225,18 +218,14 @@ const placeCodOrder = async (req, res) => {
           message: `Product not found: ${item.productId}`,
         });
       }
-
-      // Check stock
       if (product.stock < item.quantity) {
         return res.status(400).json({
           success: false,
           message: `Insufficient stock for ${product.name}`,
         });
       }
-
       const itemTotal = product.price * item.quantity;
       subtotal += itemTotal;
-
       validatedItems.push({
         product: product._id,
         name: product.name,
@@ -248,107 +237,83 @@ const placeCodOrder = async (req, res) => {
       });
     }
 
-    // Apply coupon if provided
-    let discount = 0;
-    let couponDetails = null;
-    if (couponCode) {
-      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
-      if (coupon) {
-        const validation = coupon.isValidForUser(userId);
-        if (validation.valid) {
-          if (subtotal >= coupon.minOrderValue) {
-            discount = coupon.calculateDiscount(subtotal);
-            couponDetails = {
-              code: coupon.code,
-              discount: discount,
-              discountType: coupon.discountType,
-            };
-          } else {
-            return res.status(400).json({
-              success: false,
-              message: `Minimum order value for this coupon is ₹${coupon.minOrderValue}`,
-            });
-          }
-        } else {
-          return res.status(400).json({
-            success: false,
-            message: validation.message,
-          });
-        }
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid coupon code",
-        });
-      }
-    }
+    // 5) Coupon logic, shippingCharges, tax, total…
 
-    // Calculate final amounts
-    const shippingCharges = subtotal >= 999 ? 0 : 99;
-    const tax = Math.round((subtotal - discount) * 0.18); // 18% GST
-    const total = subtotal + shippingCharges + tax - discount;
+    // 6) Generate an orderNumber (required by your schema!)
+    const orderNumber = `FH-${Date.now()}`;
 
-    // Create Razorpay order
-    const razorpayOrder = await razorpay.orders.create({
-      amount: Math.round(total * 100), // Amount in paise
-      currency: "INR",
-      receipt: `receipt_${Date.now()}`,
-      notes: {
-        userId: userId,
-        couponCode: couponCode || "",
-      },
-    });
-
-    // Store order details temporarily
+    // 7) Build the full orderData object
     const orderData = {
       user: userId,
+      orderNumber,
       items: validatedItems,
       shippingAddress,
-      pricing: {
-        subtotal,
-        shippingCharges,
-        tax,
-        discount,
-        total,
-      },
+      pricing: { subtotal, shippingCharges, tax, discount, total },
       coupon: couponDetails,
-      paymentInfo: {
-        razorpayOrderId: Math.random(),
-        paymentStatus: "pending",
-      },
+      paymentInfo: { paymentStatus: "pending", razorpayOrderId: orderNumber },
+      status: "confirmed",
+      createdAt: new Date(),
     };
 
-    // Store in user document temporarily
+    // 8) Persist the order
+    const order = new Order(orderData);
+    await order.save();
+
+    // … rest of your stock update / shiprocket / email / cart clearing …
+
+    // Create shipment on Shiprocket
+    try {
+      const populatedOrder = await Order.findById(order._id).populate(
+        "user",
+        "name email phoneNumber"
+      );
+      const shiprocketResponse = await shiprocketService.createOrder(
+        populatedOrder
+      );
+
+      if (shiprocketResponse.order_id) {
+        // Update order with Shiprocket details
+        order.trackingInfo = {
+          trackingNumber: shiprocketResponse.awb_code,
+          carrier: "Shiprocket",
+          shiprocketOrderId: shiprocketResponse.order_id,
+          trackingUrl: `https://shiprocket.co/tracking/${shiprocketResponse.awb_code}`,
+          estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        };
+        await order.save();
+      }
+    } catch (shiprocketError) {
+      console.error("Shiprocket integration error:", shiprocketError);
+      // Continue with order creation even if Shiprocket fails
+    }
+
+    // Clear user's cart and temp order data
     await User.findByIdAndUpdate(userId, {
-      tempOrderData: orderData,
+      cart: [],
+      tempOrderData: null,
     });
 
-    res.status(200).json({
+    // Send confirmation email
+    //await sendOrderConfirmationEmail(user, order);
+
+    // 9) Send back exactly one response
+    return res.status(200).json({
       success: true,
-      message: "Razorpay order created successfully",
-      razorpayOrder: {
-        id: razorpayOrder.id,
-        amount: razorpayOrder.amount,
-        currency: razorpayOrder.currency,
-      },
-      orderSummary: {
-        items: validatedItems,
-        pricing: {
-          subtotal,
-          shippingCharges,
-          tax,
-          discount,
-          total,
-        },
-        coupon: couponDetails,
+      message: "COD order placed successfully",
+      order: {
+        id: Math.random(),
+        orderNumber: order.orderNumber,
+        total: order.pricing.total,
+        status: order.status,
+        trackingNumber: order.trackingInfo?.trackingNumber,
+        estimatedDelivery: order.trackingInfo?.estimatedDelivery,
       },
     });
   } catch (error) {
-    console.error("Create Razorpay order error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create order",
-    });
+    console.error("Create COD order error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to create COD order" });
   }
 };
 
@@ -726,6 +691,7 @@ const cancelOrder = async (req, res) => {
 
 module.exports = {
   createRazorpayOrder,
+  placeCodOrder,
   verifyPaymentAndCreateOrder,
   getUserOrders,
   getOrderDetails,

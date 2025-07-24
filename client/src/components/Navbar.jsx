@@ -25,25 +25,41 @@ const Navbar = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { user, token } = useSelector((state) => state.auth || {})
-  const { categories } = useSelector((state) => state.categories || {})
-  const { items: cartItems } = useSelector((state) => state.cart || { items: [] })
-  const { items: wishlistItems } = useSelector((state) => state.wishlist || { items: [] })
-
-  const fetchCategoriesCallback = useCallback(() => {
-    dispatch(fetchCategories({ showOnHomepage: true }))
-  }, [dispatch])
+  const { user, token } = useSelector((state) => state.auth || {});
+  const { categories } = useSelector((state) => state.categories || {});
+  const { items: cartItems } = useSelector(
+    (state) => state.cart || { items: [] }
+  );
+  const { items: wishlistItems } = useSelector(
+    (state) => state.wishlist || { items: [] }
+  );
 
   useEffect(() => {
-    fetchCategoriesCallback()
-  }, [fetchCategoriesCallback])
+    dispatch(fetchCategories({ showOnHomepage: true }));
+  }, [dispatch]);
 
-  const handleSearch = (e) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      navigate(`/products?search=${encodeURIComponent(searchQuery)}`)
-      setSearchQuery("")
-      setIsMenuOpen(false)
+  const navigateToCategory = (categoryId = "") => {
+    const base = "/products?priceRange=0%2C10000&sizes=&colors=&sortBy=newest";
+    navigate(categoryId ? `${base}&category=${categoryId}` : base);
+  };
+
+  const groupedCategories = {
+    Men: [],
+    Women: [],
+    Kids: [],
+    Others: [],
+  };
+
+  (categories || []).forEach((cat) => {
+    const name = cat.name.toLowerCase();
+    if (name.includes("men") && !name.includes("women")) {
+      groupedCategories.Men.push(cat);
+    } else if (name.includes("women")) {
+      groupedCategories.Women.push(cat);
+    } else if (name.includes("kids")) {
+      groupedCategories.Kids.push(cat);
+    } else {
+      groupedCategories.Others.push(cat);
     }
   });
 
@@ -149,11 +165,10 @@ const Navbar = () => {
             >
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
-                type="text"
-                placeholder="Search for products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full py-2 pl-10 pr-4 transition-colors border-2 border-gray-200 rounded-full outline-none focus:border-pink-500"
+                placeholder="Search..."
+                className="w-full py-2 pl-10 pr-4 border-2 border-gray-200 rounded-full outline-none focus:border-pink-500"
               />
             </form>
           </div>
@@ -289,113 +304,9 @@ const Navbar = () => {
             </div>
           ))}
         </div>
-
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {isMenuOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden border-t md:hidden"
-            >
-              <div className="py-4 space-y-4">
-                {/* Mobile Search */}
-                <form onSubmit={handleSearch} className="relative">
-                  <Search className="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Search for products..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full py-2 pl-10 pr-4 border-2 border-gray-200 rounded-full"
-                  />
-                </form>
-
-                {/* Mobile Navigation */}
-                <div className="space-y-2">
-                  <Link
-                    to="/products?category=women"
-                    className="block py-2 font-medium text-gray-700 hover:text-pink-600"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Women
-                  </Link>
-                  <Link
-                    to="/products?category=men"
-                    className="block py-2 font-medium text-gray-700 hover:text-pink-600"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Men
-                  </Link>
-                  <Link
-                    to="/products?category=kids"
-                    className="block py-2 font-medium text-gray-700 hover:text-pink-600"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Kids
-                  </Link>
-                  {(categories || [])
-                    .filter(
-                      (cat) =>
-                        !cat.name.toLowerCase().includes("men") &&
-                        !cat.name.toLowerCase().includes("women") &&
-                        !cat.name.toLowerCase().includes("kids"),
-                    )
-                    .map((category) => (
-                      <Link
-                        key={category._id}
-                        to={`/products/category/${category._id}`}
-                        className="block py-2 font-medium text-gray-700 hover:text-pink-600"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        {category.name}
-                      </Link>
-                    ))}
-                </div>
-
-                {/* Mobile Actions */}
-                <div className="flex items-center justify-around pt-4 border-t">
-                  <Link
-                    to="/wishlist"
-                    className="flex items-center space-x-1 text-gray-700"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Heart className="w-5 h-5" />
-                    <span className="text-sm">Wishlist</span>
-                    {wishlistItems.length > 0 && (
-                      <span className="flex items-center justify-center w-5 h-5 text-xs text-white bg-pink-500 rounded-full">
-                        {wishlistItems.length}
-                      </span>
-                    )}
-                  </Link>
-                  {token ? (
-                    <Link
-                      to="/profile"
-                      className="flex items-center space-x-1 text-gray-700"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <User className="w-5 h-5" />
-                      <span className="text-sm">Profile</span>
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/login"
-                      className="flex items-center space-x-1 text-gray-700"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <User className="w-5 h-5" />
-                      <span className="text-sm">Login</span>
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </motion.nav>
-  )
-}
+  );
+};
 
-export default Navbar
+export default Navbar;
