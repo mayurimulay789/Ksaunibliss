@@ -9,6 +9,7 @@ import ProductCard from "../components/ProductCard"
 import ProductFilters from "../components/ProductFilter" // This component will be created/updated
 import LoadingSpinner from "../components/LoadingSpinner"
 import toast from "react-hot-toast"
+import { fetchCart,addToCart } from "../store/slices/cartSlice";
 
 const ProductsPage = () => {
   const dispatch = useDispatch()
@@ -19,6 +20,7 @@ const ProductsPage = () => {
   const [viewMode, setViewMode] = useState("grid") // "grid" or "list"
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState("newest")
+const { user } = useSelector((state) => state.auth)
 
   // Helper to parse filters from URL params
   const getFiltersFromURL = useCallback(
@@ -46,36 +48,99 @@ const ProductsPage = () => {
 
   // Fetch products whenever filters or page change
   useEffect(() => {
-    const page = searchParams.get("page") || 1
-    const params = {
-      ...filters,
-      page,
-      limit: 12,
+  const page = searchParams.get("page") || 1
+
+  // Clean filters before dispatch
+  const cleanFilters = Object.entries(filters).reduce((acc, [key, value]) => {
+    if (
+      value !== "" &&
+      value !== null &&
+      value !== undefined &&
+      !(Array.isArray(value) && value.length === 0)
+    ) {
+      acc[key] = value
     }
-    dispatch(fetchProducts(params))
-  }, [dispatch, filters, searchParams])
+    return acc
+  }, {})
+
+  const params = {
+    ...cleanFilters,
+    page,
+    limit: 12,
+  }
+
+  dispatch(fetchProducts(params))
+}, [dispatch, filters, searchParams])
 
   // Update URL params whenever filters change
   useEffect(() => {
-    // Build new params object from filters and current page param if exists
-    const params = new URLSearchParams()
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value && !(key === "sort" && value === "newest")) {
-        params.set(key, value)
-      }
-    })
-    const page = searchParams.get("page")
-    if (page && page !== "1") {
-      params.set("page", page)
-    }
-    // Only update URL params if different to avoid infinite loops
-    const currentParamsString = searchParams.toString()
-    const newParamsString = params.toString()
-    if (currentParamsString !== newParamsString) {
-      setSearchParams(params)
-    }
-  }, [filters, searchParams, setSearchParams])
+  const params = new URLSearchParams()
 
+  Object.entries(filters).forEach(([key, value]) => {
+    if (
+      value !== "" &&
+      value !== null &&
+      value !== undefined &&
+      !(Array.isArray(value) && value.length === 0) &&
+      !(key === "sort" && value === "newest")
+    ) {
+      params.set(key, value)
+    }
+  })
+
+  const page = searchParams.get("page")
+  if (page && page !== "1") {
+    params.set("page", page)
+  }
+
+  const currentParamsString = searchParams.toString()
+  const newParamsString = params.toString()
+  if (currentParamsString !== newParamsString) {
+    setSearchParams(params)
+  }
+}, [filters, searchParams, setSearchParams])
+
+const handleAddToCart = (product) => {
+  if (!user) {
+    toast.error("Please log in to add items to your cart.")
+    navigate("/login")
+    return
+  }
+const bag = document.getElementById("bag");
+  if (bag) bag.click();
+  if (!product.sizes || product.sizes.length === 0) {
+    toast.error(`${product.name} has no available sizes.`)
+    return
+  }
+
+  if (!product.colors || product.colors.length === 0) {
+    toast.error(`${product.name} has no available colors.`)
+    return
+  }
+
+  const defaultSize = product.sizes[0].size
+  const defaultColor = product.colors[0].name
+
+  dispatch(
+  addToCart({
+    productId: product._id,
+    quantity: 1,
+    size: defaultSize,
+    color: defaultColor,
+  })
+).then((res) => {
+  if (res.meta.requestStatus === "fulfilled") {
+    dispatch(fetchCart()) // ✅ Refresh cart after successful add
+    toast.success(`${product.name} added to cart!`)
+  } else {
+    toast.error("Failed to add to cart.")
+  }
+})
+.catch((err) => {
+  toast.error(err?.message || "Something went wrong.")
+})
+
+}
   // Handle filter change - merge new filters with existing
   const handleFilterChange = (newFilters) => {
     dispatch(setFilters({ ...filters, ...newFilters }))
@@ -285,7 +350,11 @@ const ProductsPage = () => {
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <ProductCard product={product} viewMode={viewMode} />
+<ProductCard
+  product={product}
+  viewMode={viewMode}
+  onAddToCart={() => handleAddToCart(product)}
+/>
                       </motion.div>
                     ))}
                   </AnimatePresence>

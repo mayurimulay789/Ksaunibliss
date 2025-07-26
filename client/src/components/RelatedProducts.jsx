@@ -97,10 +97,10 @@ const RelatedProducts = ({ currentProduct }) => {
     e.preventDefault()
     e.stopPropagation()
 
-    if (!isAuthenticated) {
-      navigate("/login")
-      return
-    }
+    // if (!isAuthenticated) {
+    //   navigate("/login")
+    //   return
+    // // }
 
     try {
       await dispatch(

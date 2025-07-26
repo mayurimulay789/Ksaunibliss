@@ -112,11 +112,12 @@ const ProductListingPage = () => {
   }
 
   const handleWishlistToggle = (product) => {
-    if (!user) {
-      toast.error("Please login to add items to wishlist")
-      return
-    }
-
+    // if (!user) {
+    //   toast.error("Please login to add items to wishlist")
+    //   return
+    // }
+const wish = document.getElementById("wish");
+  if (wish) wish.click();
     const isInWishlist = wishlistItems.some((item) => item._id === product._id)
 
     if (isInWishlist) {

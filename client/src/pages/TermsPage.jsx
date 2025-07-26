@@ -2,8 +2,7 @@
 
 import { motion } from "framer-motion"
 import { FileText, Shield, CreditCard, Truck, RotateCcw, AlertTriangle } from "lucide-react"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
+
 
 const TermsPage = () => {
   const sections = [
@@ -179,7 +178,6 @@ const TermsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       {/* Hero Section */}
       <section className="py-16 bg-gradient-to-br from-orange-50 to-red-50">
@@ -312,7 +310,6 @@ const TermsPage = () => {
         </div>
       </section>
 
-      <Footer />
     </div>
   )
 }

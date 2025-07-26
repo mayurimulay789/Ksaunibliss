@@ -3,8 +3,7 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Mail, Phone, MapPin, Clock, Send, MessageCircle, Facebook, Instagram, Twitter, Youtube } from "lucide-react"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
+
 import toast from "react-hot-toast"
 
 const ContactUsPage = () => {
@@ -122,7 +121,6 @@ const ContactUsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       {/* Hero Section */}
       <section className="py-16 bg-gradient-to-br from-orange-50 to-red-50">
@@ -406,7 +404,6 @@ const ContactUsPage = () => {
         </div>
       </section>
 
-      <Footer />
     </div>
   )
 }

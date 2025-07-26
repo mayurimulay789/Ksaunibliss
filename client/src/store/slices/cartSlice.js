@@ -14,7 +14,7 @@ export const fetchCart = createAsyncThunk("cart/fetchCart", async (_, { rejectWi
 export const addToCart = createAsyncThunk("cart/addToCart", async (cartData, { rejectWithValue }) => {
   try {
     const response = await cartAPI.addToCart(cartData)
-    return response.data
+    return response.data // Assuming this returns { cart: { items, summary } }
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to add item to cart")
   }
@@ -77,7 +77,6 @@ const cartSlice = createSlice({
       if (item) {
         item.quantity = quantity
         item.itemTotal = item.product.price * quantity
-
         // Recalculate summary
         state.summary.totalItems = state.items.reduce((total, item) => total + item.quantity, 0)
         state.summary.subtotal = state.items.reduce((total, item) => total + item.itemTotal, 0)
@@ -104,16 +103,19 @@ const cartSlice = createSlice({
         state.error = action.payload
       })
 
-      // Add to Cart
+      // Add to Cart (✅ FIXED: immediately updates badge by updating state)
       .addCase(addToCart.pending, (state) => {
         state.isLoading = true
         state.error = null
       })
       .addCase(addToCart.fulfilled, (state, action) => {
         state.isLoading = false
-        // Refresh cart after adding item
+        // ✅ Update the cart with returned items and summary
+        state.items = action.payload.cart.items
+        state.summary = action.payload.cart.summary
         state.lastUpdated = new Date().toISOString()
-      })
+        state.isLoading = false;
+})
       .addCase(addToCart.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload
@@ -140,8 +142,6 @@ const cartSlice = createSlice({
       })
       .addCase(removeFromCart.fulfilled, (state, action) => {
         state.items = state.items.filter((item) => item._id !== action.payload.itemId)
-
-        // Recalculate summary
         state.summary.totalItems = state.items.reduce((total, item) => total + item.quantity, 0)
         state.summary.subtotal = state.items.reduce((total, item) => total + item.itemTotal, 0)
         state.summary.shipping = state.summary.subtotal > 999 ? 0 : 99
@@ -168,5 +168,5 @@ const cartSlice = createSlice({
   },
 })
 
-export const { clearError, updateLocalQuantity } = cartSlice.actions
+export const { clearError, updateLocalQuantity, clearCart: clearCartReducer } = cartSlice.actions
 export default cartSlice.reducer

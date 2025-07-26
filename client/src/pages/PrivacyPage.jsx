@@ -13,8 +13,7 @@ import {
   Globe,
   Smartphone,
 } from "lucide-react"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
+
 
 const PrivacyPage = () => {
   const sections = [
@@ -303,10 +302,9 @@ const PrivacyPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       {/* Hero Section */}
-      <section className="py-16 bg-gradient-to-br from-orange-50 to-red-50">
+      <section className="py-16 bg-gradient-to-br from-red-50 to-red-50">
         <div className="container px-4 mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -315,7 +313,7 @@ const PrivacyPage = () => {
             className="max-w-3xl mx-auto text-center"
           >
             <h1 className="mb-6 text-4xl font-bold text-gray-800 md:text-5xl">
-              Privacy <span className="text-orange-500">Policy</span>
+              Privacy <span className="text-red-500">Policy</span>
             </h1>
             <p className="mb-8 text-xl text-gray-600">
               Your privacy is important to us. Learn how we collect, use, and protect your personal information.
@@ -393,7 +391,7 @@ const PrivacyPage = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
               viewport={{ once: true }}
-              className="p-8 mt-12 text-white bg-gradient-to-r from-orange-500 to-red-500 rounded-xl"
+              className="p-8 mt-12 text-white bg-gradient-to-r from-red-500 to-red-500 rounded-xl"
             >
               <div className="text-center">
                 <Shield className="w-16 h-16 mx-auto mb-6 opacity-90" />
@@ -436,11 +434,11 @@ const PrivacyPage = () => {
                   <Settings className="w-5 h-5 mr-3" />
                   <span className="font-medium">Manage Preferences</span>
                 </button>
-                <button className="flex items-center p-3 transition-colors rounded-lg bg-gray-50 hover:bg-orange-50 hover:text-orange-500">
+                <button className="flex items-center p-3 transition-colors rounded-lg bg-gray-50 hover:bg-red-50 hover:text-red-500">
                   <Database className="w-5 h-5 mr-3" />
                   <span className="font-medium">Download My Data</span>
                 </button>
-                <button className="flex items-center p-3 transition-colors rounded-lg bg-gray-50 hover:bg-orange-50 hover:text-orange-500">
+                <button className="flex items-center p-3 transition-colors rounded-lg bg-gray-50 hover:bg-red-50 hover:text-red-500">
                   <AlertTriangle className="w-5 h-5 mr-3" />
                   <span className="font-medium">Delete Account</span>
                 </button>

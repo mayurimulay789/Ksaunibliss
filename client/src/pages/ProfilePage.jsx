@@ -7,8 +7,6 @@ import { User, MapPin, Edit3, Save, X, Camera, Shield, Package, Heart } from "lu
 import { updateProfile, changePassword, uploadAvatar } from "../store/slices/authSlice"
 import { fetchUserOrders } from "../store/slices/orderSlice"
 import { fetchWishlist } from "../store/slices/wishlistSlice"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
 import LoadingSpinner from "../components/LoadingSpinner"
 import toast from "react-hot-toast"
 import { format } from "date-fns"
@@ -180,16 +178,13 @@ const { orders } = useSelector((state) => state.orders) || { orders: [] };
   if (isLoading) {
     return (
       <div>
-        <Navbar />
         <LoadingSpinner message="Loading profile..." />
-        <Footer />
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       <div className="container px-4 py-8 mx-auto">
         <div className="max-w-6xl mx-auto">
@@ -499,7 +494,6 @@ const { orders } = useSelector((state) => state.orders) || { orders: [] };
         </div>
       </div>
 
-      <Footer />
     </div>
   )
 }

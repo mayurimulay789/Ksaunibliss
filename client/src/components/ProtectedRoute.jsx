@@ -25,7 +25,7 @@ const ProtectedRoute = ({ children, adminOnly = false, digitalMarketerOnly = fal
   }
 
   // Redirect to login if not authenticated
-  if (!isAuthenticated || !user) {
+  if (!isAuthenticated ) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 

@@ -13,8 +13,8 @@ import {
   Shield,
   MessageCircle,
 } from "lucide-react"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
+// import Navbar from "../components/Navbar"
+// import Footer from "../components/Footer"
 
 const FAQPage = () => {
   const [searchQuery, setSearchQuery] = useState("")
@@ -175,7 +175,7 @@ const FAQPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      {/* <Navbar /> */}
 
       {/* Hero Section */}
       <section className="py-16 bg-gradient-to-br from-orange-50 to-red-50">
@@ -344,7 +344,7 @@ const FAQPage = () => {
         </div>
       </section>
 
-      <Footer />
+      {/* <Footer /> */}
     </div>
   )
 }

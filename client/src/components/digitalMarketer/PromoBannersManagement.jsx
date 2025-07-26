@@ -19,7 +19,7 @@ const PromoBannersManagement = () => {
   const [previewUrl, setPreviewUrl] = useState("")
 
   const dispatch = useDispatch()
-  const { banners, bannersLoading } = useSelector((state) => state.digitalMarketer)
+const { banners = [], bannersLoading } = useSelector((state) => state.digitalMarketer)
 
   useEffect(() => {
     dispatch(fetchAllBanners())

@@ -90,37 +90,39 @@ const TrendingProducts = () => {
 
   // Handle adding to cart
  
-      const handleAddToCart = (product) => {
+      const handleAddToCart = (product) => 
+        {
+    // if (!user) {
+    //   toast.error("Please log in to add items to your cart.");
+    //   navigate("/login");
+    //   return;
+    // }
+const bag = document.getElementById("bag");
+  if (bag) bag.click();
+    const rawSize = product.sizes?.[0]?.size || "";
+    const size = rawSize.includes(",") ? rawSize.split(",")[0].trim() : rawSize;
 
- if (!user) {
-      toast.error("Please log in to add items to your cart.")
-      navigate("/login") // Redirect user to login page
-      return
-    }
+    const rawColor = product.colors?.[0]?.name || "";
+    const color = rawColor.includes(",") ? rawColor.split(",")[0].trim() : rawColor;
 
-  if (!product.sizes || product.sizes.length === 0) {
-    toast.error(`${product.name} has no available sizes.`)
-    return
-  }
-
-  if (!product.colors || product.colors.length === 0) {
-    toast.error(`${product.name} has no available colors.`)
-    return
-  }
-
-  const defaultSize = product.sizes[0].size
-  const defaultColor = product.colors[0].name
-
-  dispatch(
-    addToCart({
+    const payload = {
       productId: product._id,
       quantity: 1,
-      size: defaultSize,
-      color: defaultColor,
-    })
-  )
-  toast.success(`${product.name} added to cart!`)
-}
+      size: size || undefined,
+      color: color || undefined,
+    };
+
+    dispatch(addToCart(payload))
+      .unwrap()
+      .then(() => {
+        dispatch(fetchCart());
+        toast.success("Item added to cart.");
+      })
+      .catch((err) => {
+        toast.error(err || "Failed to add item.");
+      });
+  };
+
 
 
   // Handle toggling wishlist
@@ -132,7 +134,10 @@ const TrendingProducts = () => {
     } else {
       dispatch(addToWishlist(product))
       toast.success(`${product.name} added to wishlist!`)
+    
     }
+  const wish = document.getElementById("wish");
+  if (wish) wish.click();
   }
 
   // Loader and Error State

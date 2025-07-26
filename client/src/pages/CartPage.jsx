@@ -18,8 +18,7 @@ import {
 } from "lucide-react"
 import { fetchCart, updateCartItem, removeFromCart, clearCart, updateLocalQuantity } from "../store/slices/cartSlice"
 import { addToWishlist } from "../store/slices/wishlistSlice"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
+
 import LoadingSpinner from "../components/LoadingSpinner"
 import toast from "react-hot-toast"
 
@@ -34,10 +33,10 @@ const CartPage = () => {
   const [updatingItems, setUpdatingItems] = useState(new Set())
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login")
-      return
-    }
+    // if (!isAuthenticated) {
+    //   navigate("/login")
+    //   return
+    // }
 
     dispatch(fetchCart())
   }, [dispatch, isAuthenticated, navigate])
@@ -110,16 +109,13 @@ const CartPage = () => {
   if (isLoading && items.length === 0) {
     return (
       <div>
-        <Navbar />
         <LoadingSpinner message="Loading your cart..." />
-        <Footer />
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       <div className="container px-4 py-8 mx-auto">
         {/* Header */}
@@ -344,7 +340,6 @@ const CartPage = () => {
         )}
       </div>
 
-      <Footer />
     </div>
   )
 }

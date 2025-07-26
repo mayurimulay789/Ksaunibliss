@@ -1,13 +1,23 @@
-const mongoose = require("mongoose");
-const slugify = require("slugify");
+const mongoose = require("mongoose")
 
 const productSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true },
-    slug: { type: String, required: true, unique: true },
-    description: { type: String, required: true },
-    price: { type: Number, required: true },
-    originalPrice: { type: Number },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    price: {
+      type: Number,
+      required: true,
+    },
+    originalPrice: {
+      type: Number,
+    },
     images: [
       {
         url: String,
@@ -20,14 +30,15 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
     subcategory: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Category",
-      default: null,
+      type: String,
     },
     sizes: [
       {
         size: String,
-        stock: { type: Number, default: 0 },
+        stock: {
+          type: Number,
+          default: 0,
+        },
       },
     ],
     colors: [
@@ -44,21 +55,46 @@ const productSchema = new mongoose.Schema(
       },
     ],
     rating: {
-      average: { type: Number, default: 0 },
-      count: { type: Number, default: 0 },
+      average: {
+        type: Number,
+        default: 0,
+      },
+      count: {
+        type: Number,
+        default: 0,
+      },
     },
     reviews: [
       {
-        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-        rating: { type: Number, min: 1, max: 5 },
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        rating: {
+          type: Number,
+          min: 1,
+          max: 5,
+        },
         comment: String,
         images: [String],
-        createdAt: { type: Date, default: Date.now },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
-    isActive: { type: Boolean, default: true },
-    stock: { type: Number, default: 0 },
-    sku: { type: String, unique: true },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    stock: {
+      type: Number,
+      default: 0,
+    },
+    sku: {
+      type: String,
+      unique: true,
+    },
     weight: Number,
     dimensions: {
       length: Number,
@@ -66,44 +102,17 @@ const productSchema = new mongoose.Schema(
       height: Number,
     },
   },
-  { timestamps: true }
-);
+  {
+    timestamps: true,
+  },
+)
 
-productSchema.index({ category: 1 });
-productSchema.index({ tags: 1 });
-productSchema.index({ isActive: 1 });
-productSchema.index({ "rating.average": -1 });
-productSchema.index({ price: 1 });
-
-// Generate SKU and slug before saving
-productSchema.pre("save", async function (next) {
+// Generate SKU before saving
+productSchema.pre("save", function (next) {
   if (!this.sku) {
-    let newSku;
-    let exists = true;
-
-    while (exists) {
-      newSku = "FH" + Date.now() + Math.floor(Math.random() * 1000);
-      exists = await mongoose.models.Product.findOne({ sku: newSku });
-    }
-
-    this.sku = newSku;
+    this.sku = "FH" + Date.now() + Math.floor(Math.random() * 1000)
   }
+  next()
+})
 
-  if (!this.slug) {
-    let newSlug = slugify(this.name, { lower: true, strict: true });
-    let slugExists = await mongoose.models.Product.findOne({ slug: newSlug });
-
-    let suffix = 1;
-    while (slugExists) {
-      newSlug = `${slugify(this.name, { lower: true, strict: true })}-${suffix}`;
-      slugExists = await mongoose.models.Product.findOne({ slug: newSlug });
-      suffix++;
-    }
-
-    this.slug = newSlug;
-  }
-
-  next();
-});
-
-module.exports = mongoose.model("Product", productSchema);
+module.exports = mongoose.model("Product", productSchema)

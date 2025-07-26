@@ -11,7 +11,6 @@ import LoadingSpinner from "./LoadingSpinner"
 const calculateTimeLeft = (targetDate) => {
   const difference = +new Date(targetDate) - +new Date()
   let timeLeft = {}
-
   if (difference > 0) {
     timeLeft = {
       days: Math.floor(difference / (1000 * 60 * 60 * 24)),
@@ -32,19 +31,28 @@ const PromoBanners = () => {
     dispatch(fetchPromoBanners())
   }, [dispatch])
 
-  // Set a target date for the countdown (e.g., December 13, 2024, as per image)
-  // You might want to make this dynamic from backend data if available in banner object
+  // Set a target date for the countdown
   const targetDate = "2024-12-13T00:00:00"
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft(targetDate))
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
 
   // Update countdown every second
   useEffect(() => {
     const timer = setTimeout(() => {
       setTimeLeft(calculateTimeLeft(targetDate))
     }, 1000)
-
     return () => clearTimeout(timer)
   })
+
+  // Auto-rotate banners every 5 seconds
+  useEffect(() => {
+    if (promoBanners && promoBanners.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentBannerIndex((prev) => (prev + 1) % promoBanners.length)
+      }, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [promoBanners])
 
   // Prepare countdown timer components
   const timerComponents = []
@@ -52,141 +60,167 @@ const PromoBanners = () => {
     if (!timeLeft[interval] && timeLeft[interval] !== 0) {
       return
     }
-
     timerComponents.push(
-      <motion.div
+      <div
         key={interval}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 * Object.keys(timeLeft).indexOf(interval) }}
-        className="flex flex-col items-center justify-center w-16 h-16 p-2 bg-white border border-gray-100 rounded-lg shadow-md sm:w-20 sm:h-20" // Responsive size, added border
+        className="flex flex-col items-center justify-center w-12 h-12 border rounded-lg bg-white/20 backdrop-blur-sm border-white/30"
       >
-        <span className="text-xl font-bold text-gray-800 sm:text-2xl">
-          {String(timeLeft[interval]).padStart(2, "0")}
-        </span>{" "}
-        {/* Responsive font size */}
-        <span className="text-xs text-gray-500 uppercase">{interval}</span>
-      </motion.div>,
+        <span className="text-lg font-bold text-white">{String(timeLeft[interval]).padStart(2, "0")}</span>
+        <span className="text-xs uppercase text-white/80">{interval.slice(0, 3)}</span>
+      </div>,
     )
   })
-
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } },
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
-  }
 
   if (isLoading) {
     return <LoadingSpinner />
   }
 
-  // Select the first active banner, or use a default if none exist
-  const activeBanner = promoBanners?.filter((banner) => banner.isActive)?.[0]
-
-  const bannerToDisplay = activeBanner || {
+  // Get active banners or use default
+  const activeBanners = promoBanners?.filter((banner) => banner.isActive) || []
+  const defaultBanner = {
     _id: "default-deal",
-    title: "DEAL OF THE DAY",
-    subtitle: "CLICK SHOP NOW FOR ALL DEAL OF THE PRODUCT",
-    description:
-      "Donec condimentum Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras cursus pretium sapien, in pulvinar ipsum molestie id. Aliquam erat volutpat. Duis quam tellus, ullamcorper....",
-    image: { url: "/images/deal-of-the-day.png" }, // Use the provided image as default
-    buttonText: "Shop Now",
+    title: "SHOPPERS STOP",
+    subtitle: "MIN. 30% OFF",
+    description: "Discover amazing deals on premium fashion brands",
+    image: { url: "/placeholder.svg?height=400&width=600&text=Fashion+Sale" },
+    buttonText: "SHOP NOW",
     buttonLink: "/products?deal=true",
+    brandLogo: "/placeholder.svg?height=60&width=120&text=BRAND",
   }
 
+  const bannersToShow = activeBanners.length > 0 ? activeBanners : [defaultBanner]
+  const currentBanner = bannersToShow[currentBannerIndex]
+
   return (
-    <motion.section
-      variants={containerVariants}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, amount: 0.3 }}
-      className="py-16 bg-red-50" // Light pinkish background
-    >
-      <div className="container px-4 mx-auto sm:px-6 lg:px-8">
-        <div className="grid items-center grid-cols-1 gap-12 lg:grid-cols-2">
-          {/* Left Section: Deal Details and Countdown */}
-          <div className="space-y-6 text-center lg:text-left">
-            <motion.h2
-              variants={itemVariants}
-              className="text-4xl font-extrabold leading-tight text-gray-900 sm:text-5xl"
-            >
-              {bannerToDisplay.title}
-            </motion.h2>
-            {bannerToDisplay.subtitle && (
-              <motion.p
-                variants={itemVariants}
-                className="text-base font-semibold tracking-wide uppercase sm:text-lg text-ksauni-red"
-              >
-                {bannerToDisplay.subtitle}
-              </motion.p>
-            )}
-            {bannerToDisplay.description && (
-              <motion.p
-                variants={itemVariants}
-                className="max-w-lg mx-auto text-sm leading-relaxed text-gray-700 sm:text-base lg:mx-0"
-              >
-                {bannerToDisplay.description}
-              </motion.p>
-            )}
-            <motion.p variants={itemVariants} className="text-xs text-gray-600 sm:text-sm">
-              Available until:{" "}
-              {new Date(targetDate).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}
-            </motion.p>
+    <section className="py-8 bg-gray-50">
+      <div className="px-4 mx-auto max-w-7xl">
+        {/* Main Banner */}
+        <motion.div
+          key={currentBannerIndex}
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="relative overflow-hidden shadow-2xl bg-gradient-to-r from-red-600 to-red-700 rounded-2xl"
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[400px]">
+            {/* Left Section - Product Image */}
+            <div className="relative overflow-hidden">
+              {/* Sale Badge */}
+              <div className="absolute z-10 top-6 left-6">
+                <div className="px-4 py-2 text-sm font-bold tracking-wide text-red-600 uppercase bg-white shadow-lg">
+                  SALE
+                </div>
+              </div>
 
-            {/* Countdown Timer */}
-            <div className="flex justify-center mt-8 space-x-2 lg:justify-start sm:space-x-4">
-              {" "}
-              {/* Responsive spacing */}
-              {timerComponents.length ? (
-                timerComponents
-              ) : (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-xl font-bold text-ksauni-red"
-                >
-                  Deal Expired!
-                </motion.span>
+              {/* Product Image */}
+              <div className="relative h-full min-h-[300px] lg:min-h-[400px]">
+                <img
+                  src={currentBanner.image?.url || "/placeholder.svg?height=400&width=600"}
+                  alt={currentBanner.title || "Promotional Banner"}
+                  className="absolute inset-0 object-cover w-full h-full"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-red-600/20"></div>
+              </div>
+            </div>
+
+            {/* Right Section - Promotional Content */}
+            <div className="flex flex-col justify-center p-8 text-white lg:p-12">
+              {/* Brand Logo */}
+              {currentBanner.brandLogo && (
+                <div className="mb-6">
+                  <img
+                    src={currentBanner.brandLogo || "/placeholder.svg"}
+                    alt="Brand Logo"
+                    className="w-auto h-12 filter brightness-0 invert"
+                  />
+                </div>
               )}
-            </div>
 
-            {/* Shop Now Button */}
-            <motion.div variants={itemVariants} className="pt-4">
-              <Link
-                to={bannerToDisplay.buttonLink || "/products"}
-                className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white transition-colors duration-300 rounded-full shadow-lg sm:px-8 sm:py-4 sm:text-lg bg-ksauni-red hover:bg-ksauni-dark-red" // Responsive padding
+              {/* Main Heading */}
+              <motion.h1
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="mb-4 text-4xl font-bold leading-tight lg:text-6xl"
               >
-                {bannerToDisplay.buttonText || "Shop Now"}
-              </Link>
-            </motion.div>
-          </div>
+                {currentBanner.subtitle || "MIN. 30% OFF"}
+              </motion.h1>
 
-          {/* Right Section: Image */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-            viewport={{ once: true }}
-            className="relative flex justify-center w-full lg:justify-end" // Ensure full width for responsiveness
-          >
-            <div className="relative w-full max-w-md overflow-hidden border-4 shadow-2xl rounded-xl border-ksauni-red lg:max-w-none">
-              {" "}
-              {/* Responsive width */}
-              <img
-                src={bannerToDisplay.image?.url || "/placeholder.svg?height=500&width=500"}
-                alt={bannerToDisplay.title || "Deal of the Day Product"}
-                className="object-cover w-full h-auto max-h-[400px] sm:max-h-[500px]" // Responsive max height
-              />
+              {/* Description */}
+              {currentBanner.description && (
+                <motion.p
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.3 }}
+                  className="max-w-md mb-6 text-lg text-white/90"
+                >
+                  {currentBanner.description}
+                </motion.p>
+              )}
+
+              {/* Countdown Timer */}
+              {timerComponents.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.4 }}
+                  className="flex mb-8 space-x-3"
+                >
+                  {timerComponents}
+                </motion.div>
+              )}
+
+              {/* CTA Button */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+              >
+                <Link
+                  to={currentBanner.buttonLink || "/products"}
+                  className="inline-block px-8 py-4 text-lg font-bold tracking-wide text-red-600 uppercase transition-colors duration-300 transform bg-white shadow-lg hover:bg-gray-100 hover:shadow-xl hover:-translate-y-1"
+                >
+                  {currentBanner.buttonText || "SHOP NOW"}
+                </Link>
+              </motion.div>
+
+              {/* Offer Validity */}
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="mt-4 text-sm text-white/70"
+              >
+                Offer valid until{" "}
+                {new Date(targetDate).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </motion.p>
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </motion.div>
+
+        {/* Banner Indicators */}
+        {bannersToShow.length > 1 && (
+          <div className="flex justify-center mt-6 space-x-2">
+            {bannersToShow.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentBannerIndex(index)}
+                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  index === currentBannerIndex ? "bg-red-600 w-8" : "bg-gray-300 hover:bg-gray-400"
+                }`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Secondary Banners Grid */}
+        
       </div>
-    </motion.section>
+    </section>
   )
 }
 

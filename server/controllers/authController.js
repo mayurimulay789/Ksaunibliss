@@ -99,7 +99,7 @@ const registerWithEmail = async (req, res) => {
         email: email.toLowerCase(),
         password,
         displayName: name.trim(),
-        emailVerified: false,
+        emailVerified: true,
       })
       console.log("Firebase user created:", firebaseUser.uid)
 
@@ -109,7 +109,7 @@ const registerWithEmail = async (req, res) => {
         name: name.trim(),
         email: email.toLowerCase(),
         authMethod: "email",
-        isVerified: false,
+        isVerified: true,
         role: "user",
         createdAt: new Date(),
       })

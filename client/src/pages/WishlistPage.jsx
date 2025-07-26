@@ -7,8 +7,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Heart, ShoppingBag, Trash2, ArrowLeft, Star, Plus } from "lucide-react"
 import { fetchWishlist, removeFromWishlist, clearWishlist, moveToCart } from "../store/slices/wishlistSlice"
 import { addToCart } from "../store/slices/cartSlice"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
 import LoadingSpinner from "../components/LoadingSpinner"
 import toast from "react-hot-toast"
 
@@ -128,16 +126,13 @@ const WishlistPage = () => {
   if (isLoading && items.length === 0) {
     return (
       <div>
-        <Navbar />
         <LoadingSpinner message="Loading your wishlist..." />
-        <Footer />
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       <div className="container px-4 py-8 mx-auto">
         {/* Header */}
@@ -343,7 +338,6 @@ const WishlistPage = () => {
         )}
       </div>
 
-      <Footer />
     </div>
   )
 }

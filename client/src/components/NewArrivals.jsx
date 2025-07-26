@@ -1,81 +1,109 @@
-import { useNavigate } from "react-router-dom"; // Add at the top with other imports
-
-import { useEffect, useState } from "react"
-import { useDispatch, useSelector } from "react-redux"
-import { Link } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
-import { ChevronLeft, ChevronRight, Star, Play, Pause } from "lucide-react"
-import { fetchNewArrivals } from "../store/slices/productSlice"
-import { addToCart } from "../store/slices/cartSlice"
-import LoadingSpinner from "./LoadingSpinner"
+import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, Star, Play, Pause } from "lucide-react";
+import { fetchNewArrivals } from "../store/slices/productSlice";
+import { addToCart, fetchCart } from "../store/slices/cartSlice";
+import LoadingSpinner from "./LoadingSpinner";
+import toast from "react-hot-toast";
 
 const NewArrivals = () => {
-  const dispatch = useDispatch()
-    const navigate = useNavigate() // Add navigate hook
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
+  const { newArrivals, isLoadingNewArrivals } = useSelector((state) => state.products);
 
-  const { newArrivals, isLoadingNewArrivals } = useSelector((state) => state.products)
-  const [currentSlide, setCurrentSlide] = useState(0)
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
-  const itemsPerPage = 4
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+
+  const itemsPerPage = 4;
+  const totalPages = Math.ceil(newArrivals.length / itemsPerPage) || 1;
 
   useEffect(() => {
-    dispatch(fetchNewArrivals())
-  }, [dispatch])
+    dispatch(fetchNewArrivals());
+  }, [dispatch]);
 
-  // Auto-play functionality
   useEffect(() => {
     if (newArrivals.length > 0 && isAutoPlaying) {
       const timer = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % totalPages)
-      }, 5000)
-      return () => clearInterval(timer)
+        setCurrentSlide((prev) => (prev + 1) % totalPages);
+      }, 5000);
+      return () => clearInterval(timer);
     }
-  }, [newArrivals.length, isAutoPlaying, currentSlide])
-
-  const totalPages = Math.ceil(newArrivals.length / itemsPerPage)
+  }, [newArrivals.length, isAutoPlaying, currentSlide]);
 
   const goToNextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % totalPages)
-    setIsAutoPlaying(false)
-  }
+    setCurrentSlide((prev) => (prev + 1) % totalPages);
+    setIsAutoPlaying(false);
+  };
 
   const goToPrevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + totalPages) % totalPages)
-    setIsAutoPlaying(false)
-  }
+    setCurrentSlide((prev) => (prev - 1 + totalPages) % totalPages);
+    setIsAutoPlaying(false);
+  };
 
-  const toggleAutoPlay = () => {
-    setIsAutoPlaying((prev) => !prev)
-  }
+  const toggleAutoPlay = () => setIsAutoPlaying((prev) => !prev);
 
-  const startIndex = currentSlide * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const productsToShow = newArrivals.slice(startIndex, endIndex)
+  const startIndex = currentSlide * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const productsToShow = newArrivals.slice(startIndex, endIndex);
 
   const handleAddToCart = (product) => {
-     if (!user) {
-      toast.error("Please log in to add items to your cart.")
-      navigate("/login") // Redirect user to login page
-      return
-    }
-  const payload = {
-    productId: product._id,
-    quantity: 1,
-   size: product.sizes.length > 0
-  ? product.sizes[0].size.includes(",")
-    ? product.sizes[0].size.split(",")[0].trim()
-    : product.sizes[0].size
-  : undefined,// pick only first size
-    color: product.colors.length > 0 ? product.colors[0].name : undefined, // pick color name only
-  }
-    console.log("Adding to cart:", payload)
+    // if (!user) {
+    //   toast.error("Please log in to add items to your cart.");
+    //   navigate("/login");
+    //   return;
+    // }
+const bag = document.getElementById("bag");
+  if (bag) bag.click();
+    const toastId = toast.loading('Adding to cart...');
+
+    const rawSize = product.sizes?.[0]?.size || "";
+    const size = rawSize.includes(",") ? rawSize.split(",")[0].trim() : rawSize;
+
+    const rawColor = product.colors?.[0]?.name || "";
+    const color = rawColor.includes(",") ? rawColor.split(",")[0].trim() : rawColor;
+
+    const payload = {
+      productId: product._id,
+      quantity: 1,
+      size: size || undefined,
+      color: color || undefined,
+    };
 
     dispatch(addToCart(payload))
-  }
+      .unwrap()
+      .then(() => {
+        dispatch(fetchCart());
+toast.success(`${product.name} added to cart!`, {
+        id: toastId,
+        duration: 3000,
+        position: 'bottom-right',
+        style: {
+          background: '#4BB543', // Green color for success
+          color: '#fff',
+        },
+        iconTheme: {
+          primary: '#fff',
+          secondary: '#4BB543',
+        },
+      })
+      })
+      .catch((err) => {
+toast.error(err || "Failed to add item to cart", {
+        id: toastId,
+        duration: 3000,
+        position: 'bottom-right',
+        style: {
+          background: '#FF3333', // Red color for error
+          color: '#fff',
+        },
+      });
+      });
+  };
 
-  if (isLoadingNewArrivals) {
-    return <LoadingSpinner />
-  }
+  if (isLoadingNewArrivals) return <LoadingSpinner />;
 
   return (
     <section className="py-16 bg-gray-50">
@@ -83,7 +111,7 @@ const NewArrivals = () => {
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-3xl font-bold text-gray-900">New Arrivals</h2>
           <p className="max-w-2xl mx-auto text-lg text-gray-600">
-            Discover the latest fashion trends and must-have pieces that just landed in our collection
+            Discover the latest fashion trends and must-have pieces that just landed in our collection.
           </p>
         </div>
 
@@ -97,83 +125,86 @@ const NewArrivals = () => {
               transition={{ duration: 0.5, ease: "easeInOut" }}
               className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4"
             >
-              {productsToShow.map((product) => (
-                <motion.div
-                  key={product._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                  whileHover={{
-                    scale: 1.02,
-                    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                  }}
-                  className="relative overflow-hidden transition-all duration-300 bg-white shadow-lg rounded-xl group"
-                >
-                  <div className="relative w-full overflow-hidden bg-gray-200 aspect-square">
-                    <img
-                      src={product.images?.[0]?.url || "/placeholder.svg?height=400&width=400"}
-                      alt={product.name}
-                      className="object-cover object-center w-full h-full transition-transform duration-300 group-hover:scale-105"
-                    />
-                    {product.isNew && (
+              {productsToShow.map((product) => {
+                const discountPercentage =
+                  product.originalPrice && product.originalPrice > product.price
+                    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+                    : 0;
+
+                return (
+                  <motion.div
+                    key={product._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    whileHover={{
+                      scale: 1.02,
+                      boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                    }}
+                    className="relative overflow-hidden transition-all duration-300 bg-white shadow-lg rounded-xl group"
+                  >
+                    <div className="relative w-full overflow-hidden bg-gray-200 aspect-square">
+                      <img
+                        src={product.images?.[0]?.url || "/placeholder.svg"}
+                        alt={product.name}
+                        className="object-cover object-center w-full h-full transition-transform duration-300 group-hover:scale-105"
+                      />
                       <div className="absolute top-0 left-0 px-3 py-1 text-xs font-semibold text-white rounded-br-lg bg-ksauni-red">
                         NEW
                       </div>
-                    )}
-                    {product.discount > 0 && (
-                      <div className="absolute top-0 right-0 px-3 py-1 text-xs font-semibold text-white rounded-bl-lg bg-ksauni-dark-red">
-                        -{product.discount}%
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="mb-2 text-lg font-semibold text-gray-900 line-clamp-2">{product.name}</h3>
-                    <div className="flex items-center mb-2">
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${
-                              i < Math.floor(product.averageRating || 0) ? "text-yellow-400" : "text-gray-300"
-                            }`}
-                            fill="currentColor"
-                          />
-                        ))}
-                        <span className="ml-1 text-sm text-gray-500">({product.reviewCount || 0})</span>
-                      </div>
+                      {discountPercentage > 0 && (
+                        <div className="absolute top-0 right-0 px-3 py-1 text-xs font-semibold text-white rounded-bl-lg bg-ksauni-dark-red">
+                          -{discountPercentage}%
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        {product.discount > 0 ? (
-                          <>
-                            <span className="text-xl font-bold text-gray-900">
-                              ₹{Math.round(product.price * (1 - product.discount / 100))}
-                            </span>
-                            <span className="text-sm text-gray-500 line-through">₹{product.price}</span>
-                          </>
+
+                    <div className="p-4">
+                      <h3 className="mb-2 text-lg font-semibold text-gray-900 line-clamp-2">{product.name}</h3>
+                      <div className="flex items-center mb-2">
+                        <div className="flex items-center">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-4 w-4 ${
+                                i < Math.floor(product.rating?.average || 0)
+                                  ? "text-yellow-400"
+                                  : "text-gray-300"
+                              }`}
+                              fill="currentColor"
+                            />
+                          ))}
+                          <span className="ml-1 text-sm text-gray-500">({product.rating?.count || 0})</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        {discountPercentage > 0 ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xl font-bold text-gray-900">₹{product.price}</span>
+                            <span className="text-sm text-gray-500 line-through">₹{product.originalPrice}</span>
+                          </div>
                         ) : (
                           <span className="text-xl font-bold text-gray-900">₹{product.price}</span>
                         )}
                       </div>
+                      <div className="flex mt-4 space-x-2">
+                        <Link
+                          to={`/product/${product._id}`}
+                          className="flex-1 px-4 py-2 text-sm font-medium text-center text-white transition-colors duration-200 rounded-md bg-ksauni-red hover:bg-ksauni-dark-red"
+                        >
+                          View Details
+                        </Link>
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          className="flex-1 px-4 py-2 text-sm font-medium text-center transition-colors duration-200 border rounded-md text-ksauni-red border-ksauni-red hover:bg-ksauni-red hover:text-white"
+                        >
+                          Add to Cart
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex mt-4 space-x-2">
-                      <Link
-                        to={`/product/${product._id}`}
-                        className="flex-1 px-4 py-2 text-sm font-medium text-center text-white transition-colors duration-200 rounded-md bg-ksauni-red hover:bg-ksauni-dark-red"
-                      >
-                        View Details
-                      </Link>
-                      <button
-                        onClick={() => handleAddToCart(product)}
-                        className="flex-1 px-4 py-2 text-sm font-medium text-center transition-colors duration-200 border rounded-md text-ksauni-red border-ksauni-red hover:bg-ksauni-red hover:text-white"
-                      >
-                        Add to Cart
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           </AnimatePresence>
 
@@ -208,8 +239,8 @@ const NewArrivals = () => {
                 <button
                   key={index}
                   onClick={() => {
-                    setCurrentSlide(index)
-                    setIsAutoPlaying(false)
+                    setCurrentSlide(index);
+                    setIsAutoPlaying(false);
                   }}
                   className={`w-3 h-3 rounded-full transition-colors duration-300 ${
                     index === currentSlide ? "bg-ksauni-red" : "bg-gray-300 hover:bg-gray-400"
@@ -237,7 +268,7 @@ const NewArrivals = () => {
         </div>
       </div>
     </section>
-  )
-}
+  );
+};
 
-export default NewArrivals
+export default NewArrivals;

@@ -65,11 +65,13 @@ const ProductDetailPage = () => {
   }, [currentProduct])
 
   const handleAddToCart = async () => {
-    if (!isAuthenticated) {
-      navigate("/login")
-      return
-    }
+    // if (!isAuthenticated) {
+    //   navigate("/login")
+    //   return
+    // }
 
+const bag = document.getElementById("bag");
+  if (bag) bag.click();
     if (currentProduct.sizes?.length > 0 && !selectedSize) {
       toast.error("Please select a size")
       return
@@ -101,11 +103,12 @@ const ProductDetailPage = () => {
   }
 
   const handleWishlistToggle = async () => {
-    if (!isAuthenticated) {
-      navigate("/login")
-      return
-    }
-
+    // if (!isAuthenticated) {
+    //   navigate("/login")
+    //   return
+    // }
+ const wish = document.getElementById("wish");
+  if (wish) wish.click();
     try {
       if (isInWishlist) {
         await dispatch(removeFromWishlist(currentProduct._id)).unwrap()
@@ -196,11 +199,11 @@ const ProductDetailPage = () => {
       <div className="container px-4 py-8 mx-auto">
         {/* Breadcrumb */}
         <nav className="flex items-center mb-8 space-x-2 text-sm text-gray-600">
-          <Link to="/" className="hover:text-pink-600">
+          <Link to="/" className="hover:text-red-600">
             Home
           </Link>
           <span>/</span>
-          <Link to="/products" className="hover:text-pink-600">
+          <Link to="/products" className="hover:text-red-600">
             Products
           </Link>
           <span>/</span>
@@ -360,12 +363,12 @@ const ProductDetailPage = () => {
                 <div className="flex flex-wrap gap-3">
                   {currentProduct.sizes.map((sizeData) => (
                     <button
-                      key={sizeData.size}
-                      onClick={() => setSelectedSize(sizeData.size)}
+key={sizeData.size}               
+       onClick={() => setSelectedSize(sizeData.size)}
                       disabled={sizeData.stock === 0}
                       className={`px-4 py-2 border-2 rounded-lg transition-colors font-medium ${
                         selectedSize === sizeData.size
-                          ? "border-pink-500 bg-pink-50 text-pink-700"
+                          ? "border-red-500 bg-red-50 text-red-700"
                           : sizeData.stock === 0
                             ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
                             : "border-gray-300 hover:border-gray-400"

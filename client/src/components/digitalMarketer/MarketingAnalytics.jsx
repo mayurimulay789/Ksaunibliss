@@ -24,6 +24,9 @@ const MarketingAnalytics = () => {
   const dispatch = useDispatch()
 
   const { marketingAnalytics, analyticsLoading } = useSelector((state) => state.digitalMarketer)
+useEffect(() => {
+  console.log("Analytics:", marketingAnalytics)
+}, [marketingAnalytics])
 
   useEffect(() => {
     dispatch(fetchMarketingAnalytics(selectedPeriod))
@@ -41,7 +44,22 @@ const MarketingAnalytics = () => {
     )
   }
 
-  const { summary, trafficData, salesAnalytics, topProducts, topCategories, userDemographics } = marketingAnalytics
+const {
+  summary = {
+    totalRevenue: 0,
+    totalOrders: 0,
+    totalUsers: 0,
+    conversionRate: "0%",
+    avgSessionDuration: "0m",
+    bounceRate: "0%",
+  },
+  trafficData = [],
+  salesAnalytics = [],
+  topProducts = [],
+  topCategories = [],
+  userDemographics = { ageGroups: [], devices: [], locations: [] },
+} = marketingAnalytics
+
 
   // Traffic Chart Data
   const trafficChartData = {

@@ -11,7 +11,7 @@ import PromoBanners from "../components/PromoBanners"
 import AboutBrand from "../components/AboutBrand"
 import FeaturedHighlight from '../components/FeaturedHighlight'
 import Testimonials from "../components/Testimonials"
-
+// import PromoBanners from "../components/PromoBanners"
 import {
   fetchTrendingProducts,
   fetchNewArrivals,
@@ -66,8 +66,12 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-white">
       <main>
+                                <PromoBanners/>
+
         <HeroBanner />
+
         <FeaturedCategories />
+
         <TrendingProducts />
         <NewArrivals />
         <PromoBanners />

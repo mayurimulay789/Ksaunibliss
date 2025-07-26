@@ -2,15 +2,61 @@
 import { motion } from "framer-motion"
 import { Heart, ShoppingBag, Eye, Star } from "lucide-react"
 import { Link } from "react-router-dom"
+import { useDispatch, useSelector } from "react-redux"
+import { useNavigate } from "react-router-dom"
+import { addToCart } from "../store/slices/cartSlice" // Update path if needed
+import toast from "react-hot-toast"
 
 const ProductCard = ({
   product,
   viewMode = "grid",
   isInWishlist = false,
-  onWishlistToggle = () => {}, // Default to no-op
-  onAddToCart = () => {}, // Default to no-op
-  onQuickView = () => {}, // Default to no-op
+  onWishlistToggle = () => {},
+  onQuickView = () => {},
 }) => {
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const { user } = useSelector((state) => state.auth)
+
+  const handleAddToCart = () => {
+    const bag = document.getElementById("bag");
+  if (bag) bag.click();
+    if (!user) {
+      toast.error("Please log in to add items to your cart.")
+      navigate("/login")
+      return
+    }
+
+    if (!product.sizes || product.sizes.length === 0) {
+      toast.error(`${product.name} has no available sizes.`)
+      return
+    }
+
+    if (!product.colors || product.colors.length === 0) {
+      toast.error(`${product.name} has no available colors.`)
+      return
+    }
+
+    const defaultSize = product.sizes[0].size
+    const defaultColor = product.colors[0].name
+
+    dispatch(
+      addToCart({
+        productId: product._id,
+        quantity: 1,
+        size: defaultSize,
+        color: defaultColor,
+      })
+    )
+      .unwrap()
+      .then(() => {
+        toast.success(`${product.name} added to cart!`)
+      })
+      .catch((err) => {
+        toast.error(err?.message || "Failed to add to cart.")
+      })
+  }
+
   const discountPercentage =
     product.originalPrice && product.originalPrice > product.price
       ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -110,7 +156,7 @@ const ProductCard = ({
                 )}
               </div>
               <button
-                onClick={onAddToCart}
+                onClick={handleAddToCart}
                 disabled={product.stock === 0}
                 className={`${commonButtonClasses} bg-ksauni-red hover:bg-ksauni-dark-red disabled:bg-gray-300`}
               >
@@ -178,7 +224,8 @@ const ProductCard = ({
         {/* Quick Add Button */}
         <div className="absolute transition-opacity duration-300 opacity-0 bottom-3 left-3 right-3 group-hover:opacity-100">
           <button
-            onClick={onAddToCart}
+            onClick={handleAddToCart}
+
             disabled={product.stock === 0}
             className={`${commonButtonClasses} bg-ksauni-red hover:bg-ksauni-dark-red disabled:bg-gray-300`}
           >
