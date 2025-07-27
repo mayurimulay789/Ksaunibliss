@@ -1,13 +1,14 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronDown, X, Tag, DollarSign, Star } from "lucide-react" // Import Star icon
+import { ChevronDown, X, Tag, DollarSign, Star } from "lucide-react"
 
 const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, onClose }) => {
   const [expandedSections, setExpandedSections] = useState({
     categories: true,
     price: true,
-    rating: true, // Keep rating expanded by default for better visibility
+    rating: true,
   })
   const [selectedRatings, setSelectedRatings] = useState(filters.ratings || [])
 
@@ -45,31 +46,45 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
     { label: "₹2000 - ₹5000", min: "2000", max: "5000" },
     { label: "Above ₹5000", min: "5000", max: "" },
   ]
+
   const ratings = [4, 3, 2, 1] // Ratings for "X Stars & Up"
 
   return (
-    <div className="p-6 space-y-6 bg-white border border-gray-100 shadow-lg rounded-xl">
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3 }}
+      className="p-6 space-y-6 bg-white border border-gray-100 shadow-lg rounded-xl"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800">Filters</h2>
         {onClose && (
-          <button onClick={onClose} className="p-2 transition-colors rounded-full hover:bg-gray-100">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={onClose}
+            className="p-2 transition-colors rounded-full hover:bg-gray-100"
+          >
             <X className="w-6 h-6 text-gray-600" />
-          </button>
+          </motion.button>
         )}
       </div>
 
       {/* Clear All Filters */}
-      <button
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
         onClick={onClearFilters}
         className="w-full py-2 text-sm font-medium transition-colors border rounded-lg shadow-sm text-ksauni-red border-ksauni-red/50 hover:text-white hover:bg-ksauni-red"
       >
         Clear All Filters
-      </button>
+      </motion.button>
 
       {/* Categories */}
       <div className="pb-4 border-b border-gray-100">
-        <button
+        <motion.button
+          whileHover={{ scale: 1.01 }}
           onClick={() => toggleSection("categories")}
           className="flex items-center justify-between w-full py-2 text-left"
         >
@@ -80,7 +95,7 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
           <motion.div animate={{ rotate: expandedSections.categories ? 180 : 0 }} transition={{ duration: 0.2 }}>
             <ChevronDown className="w-5 h-5 text-gray-500" />
           </motion.div>
-        </button>
+        </motion.button>
         <AnimatePresence>
           {expandedSections.categories && (
             <motion.div
@@ -91,7 +106,10 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
               className="overflow-hidden"
             >
               <div className="mt-3 space-y-2">
-                <label className="flex items-center text-gray-700 transition-colors cursor-pointer hover:text-ksauni-red">
+                <motion.label
+                  whileHover={{ scale: 1.01 }}
+                  className="flex items-center text-gray-700 transition-colors cursor-pointer hover:text-ksauni-red"
+                >
                   <input
                     type="radio"
                     name="category"
@@ -100,10 +118,11 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
                     className="w-4 h-4 border-gray-300 rounded text-ksauni-red focus:ring-ksauni-red"
                   />
                   <span className="ml-2">All Categories</span>
-                </label>
+                </motion.label>
                 {categories.map((category) => (
-                  <label
+                  <motion.label
                     key={category._id}
+                    whileHover={{ scale: 1.01 }}
                     className="flex items-center text-gray-700 transition-colors cursor-pointer hover:text-ksauni-red"
                   >
                     <input
@@ -115,7 +134,7 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
                     />
                     <span className="ml-2">{category.name}</span>
                     <span className="ml-auto text-sm text-gray-500">({category.productCount || 0})</span>
-                  </label>
+                  </motion.label>
                 ))}
               </div>
             </motion.div>
@@ -125,7 +144,8 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
 
       {/* Price Range */}
       <div className="pb-4 border-b border-gray-100">
-        <button
+        <motion.button
+          whileHover={{ scale: 1.01 }}
           onClick={() => toggleSection("price")}
           className="flex items-center justify-between w-full py-2 text-left"
         >
@@ -136,7 +156,7 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
           <motion.div animate={{ rotate: expandedSections.price ? 180 : 0 }} transition={{ duration: 0.2 }}>
             <ChevronDown className="w-5 h-5 text-gray-500" />
           </motion.div>
-        </button>
+        </motion.button>
         <AnimatePresence>
           {expandedSections.price && (
             <motion.div
@@ -173,8 +193,9 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
                 {/* Quick Price Ranges */}
                 <div className="space-y-2">
                   {priceRanges.map((range, index) => (
-                    <label
+                    <motion.label
                       key={index}
+                      whileHover={{ scale: 1.01 }}
                       className="flex items-center text-gray-700 transition-colors cursor-pointer hover:text-ksauni-red"
                     >
                       <input
@@ -185,7 +206,7 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
                         className="w-4 h-4 border-gray-300 rounded text-ksauni-red focus:ring-ksauni-red"
                       />
                       <span className="ml-2">{range.label}</span>
-                    </label>
+                    </motion.label>
                   ))}
                 </div>
               </div>
@@ -196,7 +217,8 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
 
       {/* Rating */}
       <div>
-        <button
+        <motion.button
+          whileHover={{ scale: 1.01 }}
           onClick={() => toggleSection("rating")}
           className="flex items-center justify-between w-full py-2 text-left"
         >
@@ -207,7 +229,7 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
           <motion.div animate={{ rotate: expandedSections.rating ? 180 : 0 }} transition={{ duration: 0.2 }}>
             <ChevronDown className="w-5 h-5 text-gray-500" />
           </motion.div>
-        </button>
+        </motion.button>
         <AnimatePresence>
           {expandedSections.rating && (
             <motion.div
@@ -219,8 +241,9 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
             >
               <div className="mt-3 space-y-2">
                 {ratings.map((rating) => (
-                  <label
+                  <motion.label
                     key={rating}
+                    whileHover={{ scale: 1.01 }}
                     className="flex items-center text-gray-700 transition-colors cursor-pointer hover:text-ksauni-red"
                   >
                     <input
@@ -238,14 +261,15 @@ const ProductFilters = ({ filters, categories, onFilterChange, onClearFilters, o
                       ))}
                       <span className="ml-2 text-gray-700">& Up</span>
                     </div>
-                  </label>
+                  </motion.label>
                 ))}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   )
 }
+
 export default ProductFilters

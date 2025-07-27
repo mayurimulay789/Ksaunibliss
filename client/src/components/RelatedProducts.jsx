@@ -1,12 +1,19 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, ShoppingCart, Heart } from "lucide-react"
 import { fetchProducts } from "../store/slices/productSlice"
-import { addToCart } from "../store/slices/cartSlice"
-import { addToWishlist, removeFromWishlist } from "../store/slices/wishlistSlice"
+import { addToCart, optimisticAddToCart, selectIsAddingToCart } from "../store/slices/cartSlice"
+import {
+  addToWishlist,
+  removeFromWishlist,
+  optimisticAddToWishlist,
+  optimisticRemoveFromWishlist,
+  selectIsAddingToWishlist,
+  selectIsRemovingFromWishlist,
+} from "../store/slices/wishlistSlice"
 import { Link, useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
 
@@ -26,9 +33,13 @@ const RelatedProducts = ({ currentProduct }) => {
   const { items: wishlistItems } = useSelector((state) => state.wishlist)
   const { isAuthenticated } = useSelector((state) => state.auth)
 
+  // ✅ Use selectors for better performance
+  const isAddingToCart = useSelector(selectIsAddingToCart)
+  const isAddingToWishlist = useSelector(selectIsAddingToWishlist)
+  const isRemovingFromWishlist = useSelector(selectIsRemovingFromWishlist)
+
   // Controls current carousel slide index
   const [currentSlide, setCurrentSlide] = useState(0)
-
   // Controls how many slides show based on viewport width (responsive)
   const [slidesToShow, setSlidesToShow] = useState(4)
 
@@ -89,72 +100,95 @@ const RelatedProducts = ({ currentProduct }) => {
   const prevSlide = () => setCurrentSlide((prev) => (prev <= 0 ? maxSlide : prev - 1))
 
   /**
-   * Handles adding a product to cart quickly (from carousel).
-   * - Redirects to login if user not authenticated.
-   * - Adds product with default size and color.
+   * ✅ Enhanced handleQuickAddToCart with optimistic updates
    */
   const handleQuickAddToCart = async (product, e) => {
     e.preventDefault()
     e.stopPropagation()
 
-    // if (!isAuthenticated) {
-    //   navigate("/login")
-    //   return
-    // // }
-
     try {
-      await dispatch(
-        addToCart({
-          productId: product._id,
+      const payload = {
+        productId: product._id,
+        quantity: 1,
+        size: product.sizes?.[0]?.size || "",
+        color: product.colors?.[0]?.name || "",
+      }
+
+      // ✅ Optimistic update for immediate UI feedback
+      dispatch(
+        optimisticAddToCart({
+          product,
           quantity: 1,
           size: product.sizes?.[0]?.size || "",
           color: product.colors?.[0]?.name || "",
         }),
-      ).unwrap()
+      )
 
+      // ✅ Show immediate success feedback
       toast.success(`${product.name} added to cart!`)
+
+      // ✅ Visual feedback on cart icon
+      const bagElement = document.querySelector("#bag")
+      if (bagElement) {
+        bagElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          bagElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      // ✅ Then sync with server
+      await dispatch(addToCart(payload)).unwrap()
     } catch (error) {
+      console.error("Add to cart error:", error)
       toast.error(error.message || "Failed to add to cart")
     }
   }
 
   /**
-   * Handles toggling a product in wishlist quickly (from carousel).
-   * - Redirects to login if user not authenticated.
-   * - Adds or removes product from wishlist accordingly.
+   * ✅ Enhanced handleQuickWishlist with optimistic updates
    */
   const handleQuickWishlist = async (product, e) => {
     e.preventDefault()
     e.stopPropagation()
 
-    if (!isAuthenticated) {
-      navigate("/login")
-      return
-    }
-
-    const isInWishlist = wishlistItems.some((item) => item._id === product._id)
-
     try {
+      const isInWishlist = wishlistItems.some((item) => item._id === product._id)
+
       if (isInWishlist) {
+        // ✅ Optimistic remove
+        dispatch(optimisticRemoveFromWishlist(product._id))
+        toast.success(`${product.name} removed from wishlist!`)
+
+        // ✅ Then sync with server
         await dispatch(removeFromWishlist(product._id)).unwrap()
-        toast.success("Removed from wishlist")
       } else {
-        await dispatch(addToWishlist(product._id)).unwrap()
-        toast.success("Added to wishlist")
+        // ✅ Optimistic add
+        dispatch(optimisticAddToWishlist(product))
+        toast.success(`${product.name} added to wishlist!`)
+
+        // ✅ Then sync with server
+        await dispatch(addToWishlist(product)).unwrap()
+      }
+
+      // ✅ Visual feedback on wishlist icon
+      const wishElement = document.querySelector("#wish")
+      if (wishElement) {
+        wishElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          wishElement.style.transform = "scale(1)"
+        }, 200)
       }
     } catch (error) {
+      console.error("Wishlist toggle error:", error)
       toast.error(error.message || "Failed to update wishlist")
     }
   }
 
   // Render nothing or a loader if products are loading or none found
   if (isLoading) {
-    return (
-      <div className="py-10 text-center text-gray-500">
-        Loading related products...
-      </div>
-    )
+    return <div className="py-10 text-center text-gray-500">Loading related products...</div>
   }
+
   if (relatedProducts.length === 0) {
     return null
   }
@@ -170,9 +204,7 @@ const RelatedProducts = ({ currentProduct }) => {
         {[...Array(5)].map((_, i) => (
           <svg
             key={i}
-            className={`w-3 h-3 ${
-              i < Math.floor(average || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
-            }`}
+            className={`w-3 h-3 ${i < Math.floor(average || 0) ? "text-yellow-400 fill-current" : "text-gray-300"}`}
             viewBox="0 0 20 20"
             aria-hidden="true"
           >
@@ -192,25 +224,28 @@ const RelatedProducts = ({ currentProduct }) => {
           <h2 className="text-2xl font-bold text-gray-800">You Might Also Like</h2>
           <p className="text-gray-600">Similar products in {currentProduct.category?.name}</p>
         </div>
-
         {/* Desktop Navigation Arrows */}
         <div className="items-center hidden space-x-2 md:flex">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={prevSlide}
             disabled={currentSlide === 0}
             aria-label="Previous related products"
             className="p-2 transition-colors border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={nextSlide}
             disabled={currentSlide >= maxSlide}
             aria-label="Next related products"
             className="p-2 transition-colors border border-gray-300 rounded-full hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ChevronRight className="w-5 h-5" />
-          </button>
+          </motion.button>
         </div>
       </div>
 
@@ -227,18 +262,22 @@ const RelatedProducts = ({ currentProduct }) => {
           {relatedProducts.map((product, index) => {
             const inWishlist = wishlistItems.some((item) => item._id === product._id)
             return (
-              <div
-                key={product._id}
-                className="flex-shrink-0 px-2"
-                style={{ width: `${100 / slidesToShow}%` }}
-              >
+              <div key={product._id} className="flex-shrink-0 px-2" style={{ width: `${100 / slidesToShow}%` }}>
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
+                  whileHover={{
+                    scale: 1.02,
+                    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                  }}
                   className="relative overflow-hidden transition-all duration-300 bg-white rounded-lg shadow-sm group hover:shadow-lg"
                 >
-                  <Link to={`/product/${product._id}`} className="block" aria-label={`View details for ${product.name}`}>
+                  <Link
+                    to={`/product/${product._id}`}
+                    className="block"
+                    aria-label={`View details for ${product.name}`}
+                  >
                     {/* Product Image */}
                     <div className="relative overflow-hidden bg-gray-100 aspect-square">
                       <img
@@ -246,14 +285,12 @@ const RelatedProducts = ({ currentProduct }) => {
                         alt={product.name}
                         className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                       />
-
                       {/* Discount Badge */}
                       {product.originalPrice && product.originalPrice > product.price && (
                         <div className="absolute px-2 py-1 text-xs font-medium text-white bg-red-500 rounded-full top-2 left-2">
                           {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
                         </div>
                       )}
-
                       {/* Stock Badge */}
                       {product.stock === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -262,50 +299,46 @@ const RelatedProducts = ({ currentProduct }) => {
                           </span>
                         </div>
                       )}
-
                       {/* Quick Actions on Hover */}
                       <div className="absolute flex items-center justify-between transition-opacity duration-300 opacity-0 bottom-2 left-2 right-2 group-hover:opacity-100">
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
                           onClick={(e) => handleQuickWishlist(product, e)}
+                          disabled={isAddingToWishlist || isRemovingFromWishlist}
                           aria-pressed={inWishlist}
                           aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
-                          className={`p-2 rounded-full backdrop-blur-sm transition-colors ${
+                          className={`p-2 rounded-full backdrop-blur-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                             inWishlist
                               ? "bg-pink-600 text-white"
                               : "bg-white bg-opacity-90 text-gray-600 hover:bg-pink-600 hover:text-white"
                           }`}
                         >
-                          <Heart
-                            className={`w-4 h-4 ${inWishlist ? "fill-current" : ""}`}
-                            aria-hidden="true"
-                          />
-                        </button>
-
-                        <button
+                          <Heart className={`w-4 h-4 ${inWishlist ? "fill-current" : ""}`} aria-hidden="true" />
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={(e) => handleQuickAddToCart(product, e)}
-                          disabled={product.stock === 0}
+                          disabled={product.stock === 0 || isAddingToCart}
                           aria-disabled={product.stock === 0}
                           aria-label={`Add ${product.name} to cart`}
                           className="flex items-center px-3 py-2 space-x-1 text-sm text-white transition-colors bg-pink-600 rounded-full hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                         >
                           <ShoppingCart className="w-4 h-4" aria-hidden="true" />
-                          <span>Add</span>
-                        </button>
+                          <span>{isAddingToCart ? "Adding..." : "Add"}</span>
+                        </motion.button>
                       </div>
                     </div>
-
                     {/* Product Info */}
                     <div className="p-3">
                       <h3 className="mb-1 text-sm font-medium text-gray-800 transition-colors line-clamp-2 group-hover:text-pink-600">
                         {product.name}
                       </h3>
-
                       {/* Category */}
                       <p className="mb-2 text-xs text-gray-500">{product.category?.name}</p>
-
                       {/* Rating */}
                       <RatingStars average={product.rating?.average} count={product.rating?.count} />
-
                       {/* Price */}
                       <div className="flex items-center space-x-2">
                         <span className="font-bold text-gray-800">₹{product.price}</span>
@@ -313,16 +346,12 @@ const RelatedProducts = ({ currentProduct }) => {
                           <span className="text-xs text-gray-500 line-through">₹{product.originalPrice}</span>
                         )}
                       </div>
-
                       {/* Sizes Preview */}
                       {product.sizes && product.sizes.length > 0 && (
                         <div className="mt-2">
                           <div className="flex flex-wrap gap-1">
                             {product.sizes.slice(0, 3).map(({ size }) => (
-                              <span
-                                key={size}
-                                className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded"
-                              >
+                              <span key={size} className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded">
                                 {size}
                               </span>
                             ))}
@@ -344,8 +373,10 @@ const RelatedProducts = ({ currentProduct }) => {
       {/* Mobile Navigation Dots */}
       <div className="flex justify-center space-x-2 md:hidden">
         {Array.from({ length: Math.ceil(relatedProducts.length / slidesToShow) }).map((_, index) => (
-          <button
+          <motion.button
             key={index}
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.8 }}
             onClick={() => setCurrentSlide(index)}
             aria-label={`Go to slide ${index + 1}`}
             aria-current={index === currentSlide}

@@ -1,12 +1,20 @@
 "use client"
-
 import { useEffect, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { Link, useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { Heart, ShoppingBag, Trash2, ArrowLeft, Star, Plus } from "lucide-react"
-import { fetchWishlist, removeFromWishlist, clearWishlist, moveToCart } from "../store/slices/wishlistSlice"
-import { addToCart } from "../store/slices/cartSlice"
+import {
+  fetchWishlist,
+  removeFromWishlist,
+  clearWishlist,
+  moveToCart,
+  optimisticRemoveFromWishlist,
+  selectWishlistItems,
+  selectWishlistIsLoading,
+  selectWishlistError,
+} from "../store/slices/wishlistSlice"
+import { addToCart, optimisticAddToCart, selectIsAddingToCart } from "../store/slices/cartSlice"
 import LoadingSpinner from "../components/LoadingSpinner"
 import toast from "react-hot-toast"
 
@@ -14,27 +22,44 @@ const WishlistPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
-  const { items, isLoading, error } = useSelector((state) => state.wishlist)
+  // ✅ Use memoized selectors for better performance
+  const items = useSelector(selectWishlistItems)
+  const isLoading = useSelector(selectWishlistIsLoading)
+  const error = useSelector(selectWishlistError)
+  const isAddingToCart = useSelector(selectIsAddingToCart)
   const { isAuthenticated } = useSelector((state) => state.auth)
 
   const [selectedSizes, setSelectedSizes] = useState({})
   const [movingToCart, setMovingToCart] = useState(new Set())
+  const [removingItems, setRemovingItems] = useState(new Set())
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login")
-      return
-    }
-
+    // ✅ Remove authentication redirect - let users browse wishlist
     dispatch(fetchWishlist())
-  }, [dispatch, isAuthenticated, navigate])
+  }, [dispatch])
 
   const handleRemoveFromWishlist = async (productId, productName) => {
+    // ✅ Optimistic update - remove immediately from UI
+    dispatch(optimisticRemoveFromWishlist(productId))
+    setRemovingItems((prev) => new Set(prev).add(productId))
+
+    // ✅ Trigger navbar wishlist icon animation
+    const wish = document.getElementById("wish")
+    if (wish) wish.click()
+
     try {
       await dispatch(removeFromWishlist(productId)).unwrap()
       toast.success(`${productName} removed from wishlist`)
     } catch (error) {
-      toast.error(error)
+      // ✅ Revert optimistic update on error
+      dispatch(fetchWishlist())
+      toast.error(error.message || "Failed to remove from wishlist")
+    } finally {
+      setRemovingItems((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(productId)
+        return newSet
+      })
     }
   }
 
@@ -47,6 +72,20 @@ const WishlistPage = () => {
       return
     }
 
+    // ✅ Optimistic update - add to cart immediately
+    dispatch(
+      optimisticAddToCart({
+        product,
+        quantity: 1,
+        size: size || product.sizes?.[0]?.size || "",
+        color: product.colors?.[0]?.name || "",
+      }),
+    )
+
+    // ✅ Trigger navbar cart icon animation
+    const bag = document.getElementById("bag")
+    if (bag) bag.click()
+
     setMovingToCart((prev) => new Set(prev).add(product._id))
 
     try {
@@ -54,13 +93,14 @@ const WishlistPage = () => {
         addToCart({
           productId: product._id,
           quantity: 1,
-          size,
+          size: size || product.sizes?.[0]?.size || "",
+          color: product.colors?.[0]?.name || "",
         }),
       ).unwrap()
 
       toast.success(`${product.name} added to cart`)
     } catch (error) {
-      toast.error(error)
+      toast.error(error.message || "Failed to add to cart")
     } finally {
       setMovingToCart((prev) => {
         const newSet = new Set(prev)
@@ -79,19 +119,42 @@ const WishlistPage = () => {
       return
     }
 
+    // ✅ Optimistic updates - add to cart and remove from wishlist
+    dispatch(
+      optimisticAddToCart({
+        product,
+        quantity: 1,
+        size: size || product.sizes?.[0]?.size || "",
+        color: product.colors?.[0]?.name || "",
+      }),
+    )
+    dispatch(optimisticRemoveFromWishlist(product._id))
+
+    // ✅ Trigger navbar animations
+    const bag = document.getElementById("bag")
+    const wish = document.getElementById("wish")
+    if (bag) bag.click()
+    if (wish) wish.click()
+
     setMovingToCart((prev) => new Set(prev).add(product._id))
 
     try {
       await dispatch(
         moveToCart({
           productId: product._id,
-          data: { quantity: 1, size },
+          data: {
+            quantity: 1,
+            size: size || product.sizes?.[0]?.size || "",
+            color: product.colors?.[0]?.name || "",
+          },
         }),
       ).unwrap()
 
       toast.success(`${product.name} moved to cart`)
     } catch (error) {
-      toast.error(error)
+      // ✅ Revert optimistic updates on error
+      dispatch(fetchWishlist())
+      toast.error(error.message || "Failed to move to cart")
     } finally {
       setMovingToCart((prev) => {
         const newSet = new Set(prev)
@@ -106,8 +169,12 @@ const WishlistPage = () => {
       try {
         await dispatch(clearWishlist()).unwrap()
         toast.success("Wishlist cleared successfully")
+
+        // ✅ Trigger navbar wishlist icon animation
+        const wish = document.getElementById("wish")
+        if (wish) wish.click()
       } catch (error) {
-        toast.error(error)
+        toast.error(error.message || "Failed to clear wishlist")
       }
     }
   }
@@ -119,10 +186,7 @@ const WishlistPage = () => {
     }))
   }
 
-  if (!isAuthenticated) {
-    return <LoadingSpinner message="Redirecting to login..." />
-  }
-
+  // ✅ Show loading only for initial load
   if (isLoading && items.length === 0) {
     return (
       <div>
@@ -133,12 +197,15 @@ const WishlistPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      <div className="container px-4 py-8 mx-auto">
+      <div className="container px-4 py-8 mx-auto pt-28 md:pt-32">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
-            <button onClick={() => navigate(-1)} className="p-2 transition-colors rounded-full hover:bg-gray-100">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 transition-colors rounded-full hover:bg-gray-100"
+              aria-label="Go back"
+            >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -148,11 +215,10 @@ const WishlistPage = () => {
               </p>
             </div>
           </div>
-
           {items.length > 0 && (
             <button
               onClick={handleClearWishlist}
-              className="font-medium text-red-600 transition-colors hover:text-red-700"
+              className="font-medium transition-colors text-ksauni-red hover:text-ksauni-dark-red"
             >
               Clear Wishlist
             </button>
@@ -171,7 +237,7 @@ const WishlistPage = () => {
             </p>
             <Link
               to="/products"
-              className="inline-flex items-center px-6 py-3 space-x-2 text-white transition-colors bg-pink-600 rounded-lg hover:bg-pink-700"
+              className="inline-flex items-center px-6 py-3 space-x-2 text-white transition-colors rounded-lg shadow-md bg-ksauni-red hover:bg-ksauni-dark-red"
             >
               <ShoppingBag className="w-5 h-5" />
               <span>Start Shopping</span>
@@ -188,29 +254,37 @@ const WishlistPage = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ delay: index * 0.1 }}
-                  className="overflow-hidden transition-shadow bg-white rounded-lg shadow-sm hover:shadow-md"
+                  className="overflow-hidden transition-all duration-300 bg-white rounded-lg shadow-sm hover:shadow-lg"
                 >
                   {/* Product Image */}
                   <div className="relative aspect-[3/4] overflow-hidden group">
                     <Link to={`/product/${product._id}`}>
                       <img
-                        src={product.images[0]?.url || "/placeholder.svg?height=300&width=225"}
+                        src={product.images?.[0]?.url || "/placeholder.svg?height=300&width=225"}
                         alt={product.name}
                         className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                       />
                     </Link>
 
                     {/* Remove Button */}
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
                       onClick={() => handleRemoveFromWishlist(product._id, product.name)}
-                      className="absolute p-2 transition-colors bg-white rounded-full shadow-md top-3 right-3 hover:bg-red-50 hover:text-red-500"
+                      disabled={removingItems.has(product._id)}
+                      className="absolute p-2 transition-colors bg-white rounded-full shadow-md top-3 right-3 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                      aria-label={`Remove ${product.name} from wishlist`}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      {removingItems.has(product._id) ? (
+                        <div className="w-4 h-4 border-2 border-gray-400 rounded-full border-t-transparent animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </motion.button>
 
                     {/* Discount Badge */}
                     {product.originalPrice && product.originalPrice > product.price && (
-                      <div className="absolute px-2 py-1 text-xs text-white bg-red-500 rounded-full top-3 left-3">
+                      <div className="absolute px-2 py-1 text-xs text-white rounded-full bg-ksauni-red top-3 left-3">
                         -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
                       </div>
                     )}
@@ -219,7 +293,7 @@ const WishlistPage = () => {
                   {/* Product Details */}
                   <div className="p-4">
                     <Link to={`/product/${product._id}`}>
-                      <h3 className="mb-2 font-semibold text-gray-800 transition-colors line-clamp-2 hover:text-pink-600">
+                      <h3 className="mb-2 font-semibold text-gray-800 transition-colors line-clamp-2 hover:text-ksauni-red">
                         {product.name}
                       </h3>
                     </Link>
@@ -266,7 +340,7 @@ const WishlistPage = () => {
                               disabled={sizeObj.stock === 0}
                               className={`px-3 py-1 text-sm border rounded transition-colors ${
                                 selectedSizes[product._id] === sizeObj.size
-                                  ? "border-pink-500 bg-pink-50 text-pink-600"
+                                  ? "border-ksauni-red bg-ksauni-red/10 text-ksauni-red"
                                   : sizeObj.stock === 0
                                     ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
                                     : "border-gray-300 hover:border-gray-400"
@@ -288,10 +362,12 @@ const WishlistPage = () => {
 
                     {/* Action Buttons */}
                     <div className="space-y-2">
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => handleMoveToCart(product)}
                         disabled={product.stock === 0 || movingToCart.has(product._id)}
-                        className="flex items-center justify-center w-full py-2 space-x-2 font-medium text-white transition-colors bg-pink-600 rounded-lg hover:bg-pink-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center w-full py-2 space-x-2 font-medium text-white transition-colors rounded-lg bg-ksauni-red hover:bg-ksauni-dark-red disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
                         {movingToCart.has(product._id) ? (
                           <div className="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin" />
@@ -301,16 +377,24 @@ const WishlistPage = () => {
                             <span>Move to Cart</span>
                           </>
                         )}
-                      </button>
+                      </motion.button>
 
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => handleAddToCart(product)}
-                        disabled={product.stock === 0}
-                        className="flex items-center justify-center w-full py-2 space-x-2 font-medium text-pink-600 transition-colors border border-pink-600 rounded-lg hover:bg-pink-50 disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        disabled={product.stock === 0 || isAddingToCart}
+                        className="flex items-center justify-center w-full py-2 space-x-2 font-medium transition-colors border rounded-lg text-ksauni-red border-ksauni-red hover:bg-ksauni-red/10 disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed"
                       >
-                        <Plus className="w-4 h-4" />
-                        <span>Add to Cart</span>
-                      </button>
+                        {isAddingToCart ? (
+                          <div className="w-4 h-4 border-2 rounded-full border-ksauni-red border-t-transparent animate-spin" />
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4" />
+                            <span>Add to Cart</span>
+                          </>
+                        )}
+                      </motion.button>
                     </div>
                   </div>
                 </motion.div>
@@ -329,7 +413,7 @@ const WishlistPage = () => {
           >
             <Link
               to="/products"
-              className="inline-flex items-center px-6 py-3 space-x-2 text-pink-600 transition-colors border border-pink-600 rounded-lg hover:bg-pink-50"
+              className="inline-flex items-center px-6 py-3 space-x-2 transition-colors border rounded-lg text-ksauni-red border-ksauni-red hover:bg-ksauni-red/10"
             >
               <ShoppingBag className="w-5 h-5" />
               <span>Continue Shopping</span>
@@ -337,7 +421,6 @@ const WishlistPage = () => {
           </motion.div>
         )}
       </div>
-
     </div>
   )
 }

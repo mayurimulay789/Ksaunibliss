@@ -7,10 +7,14 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Grid, List, Filter, Search, X, Star } from "lucide-react"
 import { fetchProducts, setFilters, clearFilters } from "../store/slices/productSlice"
 import { fetchCategories } from "../store/slices/categorySlice"
-import { addToWishlist, removeFromWishlist } from "../store/slices/wishlistSlice"
-import { addToCart } from "../store/slices/cartSlice"
-import { useDebounce } from 'use-debounce'
-
+import {
+  addToWishlist,
+  removeFromWishlist,
+  optimisticAddToWishlist,
+  optimisticRemoveFromWishlist,
+} from "../store/slices/wishlistSlice"
+import { addToCart, optimisticAddToCart } from "../store/slices/cartSlice"
+import { useDebounce } from "use-debounce"
 import LoadingSpinner from "../components/LoadingSpinner"
 import ProductCard from "../components/ProductCard"
 import toast from "react-hot-toast"
@@ -39,10 +43,9 @@ const ProductListingPage = () => {
   const { items: wishlistItems } = useSelector((state) => state.wishlist)
   const { user } = useSelector((state) => state.auth)
 
-
   const [viewMode, setViewMode] = useState("grid")
   const [showFilters, setShowFilters] = useState(false)
-  
+
   const sortOptions = [
     { value: "newest", label: "Newest First" },
     { value: "price-low", label: "Price: Low to High" },
@@ -68,14 +71,15 @@ const ProductListingPage = () => {
   }, [dispatch])
 
   useEffect(() => {
-  const params = {
-    page: 1,
-    limit: 20,
-    ...debouncedFilters,
-  }
-  dispatch(fetchProducts(params))
-  dispatch(setFilters(debouncedFilters))
-}, [dispatch, debouncedFilters])
+    const params = {
+      page: 1,
+      limit: 20,
+      ...debouncedFilters,
+    }
+    dispatch(fetchProducts(params))
+    dispatch(setFilters(debouncedFilters))
+  }, [dispatch, debouncedFilters])
+
   const handleFilterChange = (key, value) => {
     setLocalFilters((prev) => ({
       ...prev,
@@ -111,40 +115,92 @@ const ProductListingPage = () => {
     setSearchParams({})
   }
 
-  const handleWishlistToggle = (product) => {
-    // if (!user) {
-    //   toast.error("Please login to add items to wishlist")
-    //   return
-    // }
-const wish = document.getElementById("wish");
-  if (wish) wish.click();
-    const isInWishlist = wishlistItems.some((item) => item._id === product._id)
+  // ✅ Enhanced wishlist toggle with optimistic updates
+  const handleWishlistToggle = async (product) => {
+    try {
+      const isInWishlist = wishlistItems.some((item) => item._id === product._id)
 
-    if (isInWishlist) {
-      dispatch(removeFromWishlist(product._id))
-      toast.success("Removed from wishlist")
-    } else {
-      dispatch(addToWishlist(product))
-      toast.success("Added to wishlist!")
+      if (isInWishlist) {
+        // ✅ Optimistic remove
+        dispatch(optimisticRemoveFromWishlist(product._id))
+        toast.success(`${product.name} removed from wishlist!`)
+
+        // ✅ Then sync with server
+        await dispatch(removeFromWishlist(product._id)).unwrap()
+      } else {
+        // ✅ Optimistic add
+        dispatch(optimisticAddToWishlist(product))
+        toast.success(`${product.name} added to wishlist!`)
+
+        // ✅ Then sync with server
+        await dispatch(addToWishlist(product)).unwrap()
+      }
+
+      // ✅ Visual feedback on wishlist icon
+      const wishElement = document.querySelector("#wish")
+      if (wishElement) {
+        wishElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          wishElement.style.transform = "scale(1)"
+        }, 200)
+      }
+    } catch (error) {
+      console.error("Wishlist toggle error:", error)
+      toast.error(error?.message || "Failed to update wishlist")
     }
   }
 
-  const handleAddToCart = (product) => {
-    if (!user) {
-      toast.error("Please login to add items to cart")
-      return
-    }
+  // ✅ Enhanced add to cart with optimistic updates
+  const handleAddToCart = async (product) => {
+    try {
+      if (!product.sizes || product.sizes.length === 0) {
+        toast.error(`${product.name} has no available sizes.`)
+        return
+      }
 
-    dispatch(
-      addToCart({
+      if (!product.colors || product.colors.length === 0) {
+        toast.error(`${product.name} has no available colors.`)
+        return
+      }
+
+      const defaultSize = product.sizes[0].size
+      const defaultColor = product.colors[0].name
+
+      const payload = {
         productId: product._id,
         quantity: 1,
-        price: product.price,
-        name: product.name,
-        image: product.images[0]?.url,
-      }),
-    )
-    toast.success("Added to cart!")
+        size: defaultSize,
+        color: defaultColor,
+      }
+
+      // ✅ Optimistic update for immediate UI feedback
+      dispatch(
+        optimisticAddToCart({
+          product,
+          quantity: 1,
+          size: defaultSize,
+          color: defaultColor,
+        }),
+      )
+
+      // ✅ Show immediate success feedback
+      toast.success(`${product.name} added to cart!`)
+
+      // ✅ Visual feedback on cart icon
+      const bagElement = document.querySelector("#bag")
+      if (bagElement) {
+        bagElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          bagElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      // ✅ Then sync with server
+      await dispatch(addToCart(payload)).unwrap()
+    } catch (error) {
+      console.error("Add to cart error:", error)
+      toast.error(error?.message || "Failed to add to cart")
+    }
   }
 
   const handleQuickView = (product) => {
@@ -161,7 +217,6 @@ const wish = document.getElementById("wish");
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <div className="container px-4 py-8 mx-auto">
         {/* Header */}
         <div className="flex flex-col mb-8 md:flex-row md:items-center md:justify-between">
@@ -171,14 +226,13 @@ const wish = document.getElementById("wish");
             </h1>
             <p className="text-gray-600">{pagination.total} products found</p>
           </div>
-
           <div className="flex items-center mt-4 space-x-4 md:mt-0">
             {/* View Mode Toggle */}
             <div className="flex bg-white border rounded-lg">
               <button
                 onClick={() => setViewMode("grid")}
                 className={`p-2 rounded-l-lg transition-colors ${
-                  viewMode === "grid" ? "bg-orange-500 text-white" : "text-gray-600 hover:bg-gray-50"
+                  viewMode === "grid" ? "bg-ksauni-red text-white" : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <Grid className="w-5 h-5" />
@@ -186,18 +240,17 @@ const wish = document.getElementById("wish");
               <button
                 onClick={() => setViewMode("list")}
                 className={`p-2 rounded-r-lg transition-colors ${
-                  viewMode === "list" ? "bg-orange-500 text-white" : "text-gray-600 hover:bg-gray-50"
+                  viewMode === "list" ? "bg-ksauni-red text-white" : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <List className="w-5 h-5" />
               </button>
             </div>
-
             {/* Sort Dropdown */}
             <select
               value={localFilters.sortBy}
               onChange={(e) => handleFilterChange("sortBy", e.target.value)}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-ksauni-red focus:border-ksauni-red"
             >
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -205,11 +258,10 @@ const wish = document.getElementById("wish");
                 </option>
               ))}
             </select>
-
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-4 py-2 space-x-2 text-white bg-orange-500 rounded-lg md:hidden"
+              className="flex items-center px-4 py-2 space-x-2 text-white rounded-lg bg-ksauni-red md:hidden"
             >
               <Filter className="w-4 h-4" />
               <span>Filters</span>
@@ -230,7 +282,7 @@ const wish = document.getElementById("wish");
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold">Filters</h3>
                   <div className="flex items-center space-x-2">
-                    <button onClick={handleClearFilters} className="text-sm text-orange-500 hover:text-orange-600">
+                    <button onClick={handleClearFilters} className="text-sm text-ksauni-red hover:text-ksauni-dark-red">
                       Clear All
                     </button>
                     <button
@@ -248,7 +300,7 @@ const wish = document.getElementById("wish");
                   <select
                     value={localFilters.category}
                     onChange={(e) => handleFilterChange("category", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ksauni-red focus:border-ksauni-red"
                   >
                     <option value="">All Categories</option>
                     {categories.map((category) => (
@@ -269,7 +321,7 @@ const wish = document.getElementById("wish");
                       max="10000"
                       value={localFilters.priceRange[1]}
                       onChange={(e) => handleFilterChange("priceRange", [0, Number.parseInt(e.target.value)])}
-                      className="w-full accent-orange-500"
+                      className="w-full accent-ksauni-red"
                     />
                     <div className="flex justify-between text-sm text-gray-600">
                       <span>₹0</span>
@@ -288,7 +340,7 @@ const wish = document.getElementById("wish");
                         onClick={() => handleSizeToggle(size)}
                         className={`py-2 px-3 border rounded-lg text-sm transition-colors ${
                           localFilters.sizes.includes(size)
-                            ? "border-orange-500 bg-orange-50 text-orange-600"
+                            ? "border-ksauni-red bg-ksauni-red/10 text-ksauni-red"
                             : "border-gray-300 hover:border-gray-400"
                         }`}
                       >
@@ -308,7 +360,7 @@ const wish = document.getElementById("wish");
                         onClick={() => handleColorToggle(color.value)}
                         className={`w-10 h-10 rounded-full border-2 transition-all ${
                           localFilters.colors.includes(color.value)
-                            ? "border-orange-500 scale-110"
+                            ? "border-ksauni-red scale-110"
                             : "border-gray-300 hover:border-gray-400"
                         }`}
                         style={{ backgroundColor: color.value }}
@@ -327,7 +379,7 @@ const wish = document.getElementById("wish");
                         key={rating}
                         onClick={() => handleFilterChange("rating", rating)}
                         className={`flex items-center space-x-2 w-full p-2 rounded-lg transition-colors ${
-                          localFilters.rating === rating ? "bg-orange-50 text-orange-600" : "hover:bg-gray-50"
+                          localFilters.rating === rating ? "bg-ksauni-red/10 text-ksauni-red" : "hover:bg-gray-50"
                         }`}
                       >
                         <div className="flex">
@@ -358,7 +410,7 @@ const wish = document.getElementById("wish");
                 <p className="mb-8 text-gray-600">Try adjusting your filters or search terms</p>
                 <button
                   onClick={handleClearFilters}
-                  className="px-6 py-3 text-white transition-colors bg-orange-500 rounded-lg hover:bg-orange-600"
+                  className="px-6 py-3 text-white transition-colors rounded-lg bg-ksauni-red hover:bg-ksauni-dark-red"
                 >
                   Clear Filters
                 </button>
@@ -383,7 +435,6 @@ const wish = document.getElementById("wish");
                         viewMode={viewMode}
                         isInWishlist={wishlistItems.some((item) => item._id === product._id)}
                         onWishlistToggle={() => handleWishlistToggle(product)}
-                        onAddToCart={() => handleAddToCart(product)}
                         onQuickView={() => handleQuickView(product)}
                       />
                     </motion.div>
@@ -394,32 +445,30 @@ const wish = document.getElementById("wish");
 
             {/* Pagination */}
             {pagination && pagination.totalPages > 1 && (
-  <div className="flex justify-center mt-12">
-    <div className="flex items-center space-x-2">
-      {[...Array(pagination.totalPages)].map((_, index) => (
-        <button
-          key={index}
-          onClick={() => {
-            const params = { ...localFilters, page: index + 1 };
-            dispatch(fetchProducts(params));
-          }}
-          className={`px-4 py-2 rounded-lg transition-colors ${
-            pagination.currentPage === index + 1
-              ? "bg-orange-500 text-white"
-              : "bg-white text-gray-600 hover:bg-gray-50 border"
-          }`}
-        >
-          {index + 1}
-        </button>
-      ))}
-    </div>
-  </div>
-)}
-
+              <div className="flex justify-center mt-12">
+                <div className="flex items-center space-x-2">
+                  {[...Array(pagination.totalPages)].map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        const params = { ...localFilters, page: index + 1 }
+                        dispatch(fetchProducts(params))
+                      }}
+                      className={`px-4 py-2 rounded-lg transition-colors ${
+                        pagination.currentPage === index + 1
+                          ? "bg-ksauni-red text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-50 border"
+                      }`}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
     </div>
   )
 }

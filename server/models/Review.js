@@ -96,6 +96,6 @@ reviewSchema.index({ status: 1 })
 reviewSchema.index({ product: 1, rating: -1, createdAt: -1 })
 
 // Ensure one review per user per product
-reviewSchema.index({ user: 1, product: 1 }, { unique: true })
+// reviewSchema.index({ user: 1, product: 1 }, { unique: true })
 
 module.exports = mongoose.model("Review", reviewSchema)

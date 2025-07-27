@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   createRazorpayOrder,
+  placeCodOrder,
   verifyPaymentAndCreateOrder,
   getUserOrders,
   getOrderDetails,
@@ -15,6 +16,7 @@ const router = express.Router();
 router.use(protect);
 
 router.post("/create-razorpay-order", createRazorpayOrder);
+router.post("/cod", placeCodOrder);
 router.post("/verify-payment", verifyPaymentAndCreateOrder);
 router.get("/my-orders", getUserOrders);
 router.get("/:orderId", getOrderDetails);

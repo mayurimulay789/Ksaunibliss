@@ -17,7 +17,6 @@ export const searchProducts = createAsyncThunk(
       })
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products?${params}`)
-
       if (!response.ok) {
         throw new Error("Failed to search products")
       }
@@ -42,7 +41,6 @@ export const getSearchSuggestions = createAsyncThunk(
   async (query, { rejectWithValue }) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products/suggestions?q=${query}`)
-
       if (!response.ok) {
         throw new Error("Failed to get suggestions")
       }

@@ -16,9 +16,15 @@ import {
   RotateCcw,
   ShoppingCart,
 } from "lucide-react"
-import { fetchCart, updateCartItem, removeFromCart, clearCart, updateLocalQuantity } from "../store/slices/cartSlice"
-import { addToWishlist } from "../store/slices/wishlistSlice"
-
+import {
+  fetchCart,
+  updateCartItem,
+  removeFromCart,
+  clearCart,
+  optimisticUpdateQuantity,
+  optimisticRemoveFromCart,
+} from "../store/slices/cartSlice"
+import { addToWishlist, optimisticAddToWishlist } from "../store/slices/wishlistSlice"
 import LoadingSpinner from "../components/LoadingSpinner"
 import toast from "react-hot-toast"
 
@@ -33,26 +39,23 @@ const CartPage = () => {
   const [updatingItems, setUpdatingItems] = useState(new Set())
 
   useEffect(() => {
-    // if (!isAuthenticated) {
-    //   navigate("/login")
-    //   return
-    // }
-
     dispatch(fetchCart())
-  }, [dispatch, isAuthenticated, navigate])
+  }, [dispatch])
 
   const handleQuantityChange = async (itemId, newQuantity) => {
     if (newQuantity < 1 || newQuantity > 10) return
 
-    // Optimistic update
-    dispatch(updateLocalQuantity({ itemId, quantity: newQuantity }))
+    // Optimistic update for immediate UI feedback
+    dispatch(optimisticUpdateQuantity({ itemId, quantity: newQuantity }))
 
     setUpdatingItems((prev) => new Set(prev).add(itemId))
 
     try {
+      // Then sync with server
       await dispatch(updateCartItem({ itemId, data: { quantity: newQuantity } })).unwrap()
     } catch (error) {
-      toast.error(error)
+      console.error("Update quantity error:", error)
+      toast.error(error?.message || "Failed to update quantity")
       // Revert optimistic update by refetching cart
       dispatch(fetchCart())
     } finally {
@@ -66,24 +69,59 @@ const CartPage = () => {
 
   const handleRemoveItem = async (itemId, productName) => {
     try {
-      await dispatch(removeFromCart(itemId)).unwrap()
+      // Optimistic update for immediate UI feedback
+      dispatch(optimisticRemoveFromCart(itemId))
       toast.success(`${productName} removed from cart`)
+
+      // Visual feedback on cart icon
+      const bagElement = document.querySelector("#bag")
+      if (bagElement) {
+        bagElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          bagElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      // Then sync with server
+      await dispatch(removeFromCart(itemId)).unwrap()
     } catch (error) {
-      toast.error(error)
+      console.error("Remove from cart error:", error)
+      toast.error(error?.message || "Failed to remove from cart")
     }
   }
 
   const handleMoveToWishlist = async (item) => {
     try {
-      // Add to wishlist
-      await dispatch(addToWishlist(item.product._id)).unwrap()
-
-      // Remove from cart
-      await dispatch(removeFromCart(item._id)).unwrap()
+      // Optimistic updates for both cart and wishlist
+      dispatch(optimisticAddToWishlist(item.product))
+      dispatch(optimisticRemoveFromCart(item._id))
 
       toast.success(`${item.product.name} moved to wishlist`)
+
+      // Visual feedback on both icons
+      const bagElement = document.querySelector("#bag")
+      const wishElement = document.querySelector("#wish")
+
+      if (bagElement) {
+        bagElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          bagElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      if (wishElement) {
+        wishElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          wishElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      // Then sync with server
+      await dispatch(addToWishlist(item.product._id)).unwrap()
+      await dispatch(removeFromCart(item._id)).unwrap()
     } catch (error) {
-      toast.error(error)
+      console.error("Move to wishlist error:", error)
+      toast.error(error?.message || "Failed to move to wishlist")
     }
   }
 
@@ -93,7 +131,7 @@ const CartPage = () => {
         await dispatch(clearCart()).unwrap()
         toast.success("Cart cleared successfully")
       } catch (error) {
-        toast.error(error)
+        toast.error(error?.message || "Failed to clear cart")
       }
     }
   }
@@ -102,28 +140,28 @@ const CartPage = () => {
     return wishlistItems.some((item) => item._id === productId)
   }
 
-  if (!isAuthenticated) {
-    return <LoadingSpinner message="Redirecting to login..." />
-  }
-
   if (isLoading && items.length === 0) {
     return (
-      <div>
+      <div className="pt-28 md:pt-32">
         <LoadingSpinner message="Loading your cart..." />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-
+    <div className="min-h-screen bg-gray-50 pt-28 md:pt-32">
       <div className="container px-4 py-8 mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
-            <button onClick={() => navigate(-1)} className="p-2 transition-colors rounded-full hover:bg-gray-100">
+            <motion.button
+              onClick={() => navigate(-1)}
+              className="p-2 transition-colors rounded-full hover:bg-gray-100"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
               <ArrowLeft className="w-5 h-5" />
-            </button>
+            </motion.button>
             <div>
               <h1 className="text-2xl font-bold text-gray-800 md:text-3xl">Shopping Cart</h1>
               <p className="text-gray-600">
@@ -131,11 +169,15 @@ const CartPage = () => {
               </p>
             </div>
           </div>
-
           {items.length > 0 && (
-            <button onClick={handleClearCart} className="font-medium text-red-600 transition-colors hover:text-red-700">
+            <motion.button
+              onClick={handleClearCart}
+              className="font-medium text-red-600 transition-colors hover:text-red-700"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
               Clear Cart
-            </button>
+            </motion.button>
           )}
         </div>
 
@@ -190,12 +232,14 @@ const CartPage = () => {
                           >
                             {item.product.name}
                           </Link>
-                          <button
+                          <motion.button
                             onClick={() => handleRemoveItem(item._id, item.product.name)}
                             className="p-1 text-gray-400 transition-colors hover:text-red-500"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
                           >
                             <Trash2 className="w-5 h-5" />
-                          </button>
+                          </motion.button>
                         </div>
 
                         {/* Size and Color */}
@@ -216,34 +260,40 @@ const CartPage = () => {
                           <div className="flex items-center space-x-3">
                             {/* Quantity Controls */}
                             <div className="flex items-center border border-gray-300 rounded-lg">
-                              <button
+                              <motion.button
                                 onClick={() => handleQuantityChange(item._id, item.quantity - 1)}
                                 disabled={item.quantity <= 1 || updatingItems.has(item._id)}
                                 className="p-2 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
                               >
                                 <Minus className="w-4 h-4" />
-                              </button>
+                              </motion.button>
                               <span className="px-4 py-2 font-medium min-w-[3rem] text-center">
                                 {updatingItems.has(item._id) ? "..." : item.quantity}
                               </span>
-                              <button
+                              <motion.button
                                 onClick={() => handleQuantityChange(item._id, item.quantity + 1)}
                                 disabled={item.quantity >= 10 || updatingItems.has(item._id)}
                                 className="p-2 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
                               >
                                 <Plus className="w-4 h-4" />
-                              </button>
+                              </motion.button>
                             </div>
 
                             {/* Move to Wishlist */}
                             {!isInWishlist(item.product._id) && (
-                              <button
+                              <motion.button
                                 onClick={() => handleMoveToWishlist(item)}
                                 className="p-2 text-gray-400 transition-colors hover:text-pink-500"
                                 title="Move to Wishlist"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
                               >
                                 <Heart className="w-5 h-5" />
-                              </button>
+                              </motion.button>
                             )}
                           </div>
                         </div>
@@ -302,12 +352,14 @@ const CartPage = () => {
                 )}
 
                 {/* Checkout Button */}
-                <button
+                <motion.button
                   onClick={() => navigate("/checkout")}
                   className="w-full py-3 mb-4 font-medium text-white transition-colors bg-pink-600 rounded-lg hover:bg-pink-700"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   Proceed to Checkout
-                </button>
+                </motion.button>
 
                 {/* Continue Shopping */}
                 <Link
@@ -339,7 +391,6 @@ const CartPage = () => {
           </div>
         )}
       </div>
-
     </div>
   )
 }

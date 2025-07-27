@@ -63,7 +63,7 @@ const Testimonials = () => {
         </div>
 
         <div className="relative max-w-4xl mx-auto">
-          <div className="p-8 text-center bg-white rounded-lg shadow-lg">
+          <div className="p-8 text-center bg-red-600 rounded-lg shadow-lg">
             <div className="flex justify-center mb-6">
               {[...Array(testimonials[currentTestimonial].rating)].map((_, i) => (
                 <svg key={i} className="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
@@ -83,8 +83,8 @@ const Testimonials = () => {
                 className="object-cover w-12 h-12 mr-4 rounded-full"
               />
               <div className="text-left">
-                <div className="font-semibold text-gray-900">{testimonials[currentTestimonial].name}</div>
-                <div className="text-sm text-gray-600">{testimonials[currentTestimonial].role}</div>
+                <div className="font-semibold text-black-900">{testimonials[currentTestimonial].name}</div>
+                <div className="text-sm text-black-600">{testimonials[currentTestimonial].role}</div>
               </div>
             </div>
           </div>

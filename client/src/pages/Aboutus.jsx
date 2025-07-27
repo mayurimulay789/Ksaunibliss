@@ -2,8 +2,7 @@
 
 import { motion } from "framer-motion"
 import { Award, Users, Heart, Globe, Shield, Leaf } from "lucide-react"
-import Navbar from "../components/Navbar"
-import Footer from "../components/Footer"
+
 
 const AboutUsPage = () => {
   const stats = [
@@ -98,7 +97,6 @@ const AboutUsPage = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
 
       {/* Hero Section */}
       <section className="relative py-20 bg-gradient-to-br from-orange-50 to-red-50">
@@ -372,7 +370,6 @@ const AboutUsPage = () => {
         </div>
       </section>
 
-      <Footer />
     </div>
   )
 }

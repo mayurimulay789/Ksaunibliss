@@ -1,39 +1,40 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
-import * as reviewAPI from "../api/reviewAPI"
+import reviewAPI from "../api/reviewAPI" // ✅ FIXED
 
-// Async thunks
 export const fetchProductReviews = createAsyncThunk(
   "review/fetchProductReviews",
   async (productId, { rejectWithValue }) => {
     try {
+      console.log("STEP 1: Fetching reviews for product ID:", productId)
       const response = await reviewAPI.getProductReviews(productId)
-      return response.data
+      console.log("STEP 2: Raw response received:", response)
+      console.log("STEP 3: Response data:", response.data)
+      return response.data // Should be: { reviews: [...], stats: {...} }
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to fetch reviews")
+      console.log("STEP 4: Entered catch block")
+      console.error("Error fetching product reviews:", error)
+      return rejectWithValue(error?.response?.data?.message || "Failed to fetch reviews")
     }
   },
 )
 
-export const createReview = createAsyncThunk("review/createReview", async (reviewData, { rejectWithValue }) => {
+export const createReview = createAsyncThunk("review/createReview", async (data, { rejectWithValue }) => {
   try {
-    const response = await reviewAPI.createReview(reviewData)
+    const response = await reviewAPI.createReview(data)
     return response.data
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to create review")
   }
 })
 
-export const updateReview = createAsyncThunk(
-  "review/updateReview",
-  async ({ reviewId, reviewData }, { rejectWithValue }) => {
-    try {
-      const response = await reviewAPI.updateReview(reviewId, reviewData)
-      return response.data
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to update review")
-    }
-  },
-)
+export const updateReview = createAsyncThunk("review/updateReview", async ({ reviewId, reviewData }, { rejectWithValue }) => {
+  try {
+    const response = await reviewAPI.updateReview(reviewId, reviewData)
+    return response.data
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to update review")
+  }
+})
 
 export const deleteReview = createAsyncThunk("review/deleteReview", async (reviewId, { rejectWithValue }) => {
   try {
@@ -46,7 +47,7 @@ export const deleteReview = createAsyncThunk("review/deleteReview", async (revie
 
 export const likeReview = createAsyncThunk("review/likeReview", async (reviewId, { rejectWithValue }) => {
   try {
-    const response = await reviewAPI.likeReview(reviewId)
+    const response = await reviewAPI.toggleReviewLike(reviewId)
     return response.data
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to like review")
@@ -61,13 +62,7 @@ const initialState = {
   reviewStats: {
     averageRating: 0,
     totalReviews: 0,
-    ratingDistribution: {
-      5: 0,
-      4: 0,
-      3: 0,
-      2: 0,
-      1: 0,
-    },
+    ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
   },
 }
 
@@ -117,22 +112,20 @@ const reviewSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch product reviews
       .addCase(fetchProductReviews.pending, (state) => {
         state.loading = true
         state.error = null
       })
       .addCase(fetchProductReviews.fulfilled, (state, action) => {
         state.loading = false
-        state.currentProductReviews = action.payload
-        // Calculate stats
-        reviewSlice.caseReducers.calculateReviewStats(state)
+        state.currentProductReviews = action.payload.reviews
+        state.reviewStats = action.payload.stats
       })
       .addCase(fetchProductReviews.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload
       })
-      // Create review
+
       .addCase(createReview.pending, (state) => {
         state.loading = true
         state.error = null
@@ -146,22 +139,22 @@ const reviewSlice = createSlice({
         state.loading = false
         state.error = action.payload
       })
-      // Update review
+
       .addCase(updateReview.fulfilled, (state, action) => {
-        const index = state.currentProductReviews.findIndex((review) => review._id === action.payload._id)
+        const index = state.currentProductReviews.findIndex((r) => r._id === action.payload._id)
         if (index !== -1) {
           state.currentProductReviews[index] = action.payload
           reviewSlice.caseReducers.calculateReviewStats(state)
         }
       })
-      // Delete review
+
       .addCase(deleteReview.fulfilled, (state, action) => {
-        state.currentProductReviews = state.currentProductReviews.filter((review) => review._id !== action.payload)
+        state.currentProductReviews = state.currentProductReviews.filter((r) => r._id !== action.payload)
         reviewSlice.caseReducers.calculateReviewStats(state)
       })
-      // Like review
+
       .addCase(likeReview.fulfilled, (state, action) => {
-        const index = state.currentProductReviews.findIndex((review) => review._id === action.payload._id)
+        const index = state.currentProductReviews.findIndex((r) => r._id === action.payload._id)
         if (index !== -1) {
           state.currentProductReviews[index] = action.payload
         }

@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useCallback } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { useSearchParams, useNavigate } from "react-router-dom"
@@ -5,22 +7,24 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Filter, Grid, List, SlidersHorizontal, X } from "lucide-react"
 import { fetchProducts, setFilters, clearFilters } from "../store/slices/productSlice"
 import { fetchCategories } from "../store/slices/categorySlice"
+import { addToCart, optimisticAddToCart } from "../store/slices/cartSlice"
 import ProductCard from "../components/ProductCard"
-import ProductFilters from "../components/ProductFilter" // This component will be created/updated
+import ProductFilters from "../components/ProductFilter"
 import LoadingSpinner from "../components/LoadingSpinner"
 import toast from "react-hot-toast"
-import { fetchCart,addToCart } from "../store/slices/cartSlice";
 
 const ProductsPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+
   const { products, pagination, isLoading, error, filters } = useSelector((state) => state.products)
   const { categories } = useSelector((state) => state.categories)
+  const { user } = useSelector((state) => state.auth)
+
   const [viewMode, setViewMode] = useState("grid") // "grid" or "list"
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState("newest")
-const { user } = useSelector((state) => state.auth)
 
   // Helper to parse filters from URL params
   const getFiltersFromURL = useCallback(
@@ -48,99 +52,105 @@ const { user } = useSelector((state) => state.auth)
 
   // Fetch products whenever filters or page change
   useEffect(() => {
-  const page = searchParams.get("page") || 1
+    const page = searchParams.get("page") || 1
+    // Clean filters before dispatch
+    const cleanFilters = Object.entries(filters).reduce((acc, [key, value]) => {
+      if (value !== "" && value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0)) {
+        acc[key] = value
+      }
+      return acc
+    }, {})
 
-  // Clean filters before dispatch
-  const cleanFilters = Object.entries(filters).reduce((acc, [key, value]) => {
-    if (
-      value !== "" &&
-      value !== null &&
-      value !== undefined &&
-      !(Array.isArray(value) && value.length === 0)
-    ) {
-      acc[key] = value
+    const params = {
+      ...cleanFilters,
+      page,
+      limit: 12,
     }
-    return acc
-  }, {})
 
-  const params = {
-    ...cleanFilters,
-    page,
-    limit: 12,
-  }
-
-  dispatch(fetchProducts(params))
-}, [dispatch, filters, searchParams])
+    dispatch(fetchProducts(params))
+  }, [dispatch, filters, searchParams])
 
   // Update URL params whenever filters change
   useEffect(() => {
-  const params = new URLSearchParams()
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => {
+      if (
+        value !== "" &&
+        value !== null &&
+        value !== undefined &&
+        !(Array.isArray(value) && value.length === 0) &&
+        !(key === "sort" && value === "newest")
+      ) {
+        params.set(key, value)
+      }
+    })
 
-  Object.entries(filters).forEach(([key, value]) => {
-    if (
-      value !== "" &&
-      value !== null &&
-      value !== undefined &&
-      !(Array.isArray(value) && value.length === 0) &&
-      !(key === "sort" && value === "newest")
-    ) {
-      params.set(key, value)
+    const page = searchParams.get("page")
+    if (page && page !== "1") {
+      params.set("page", page)
     }
-  })
 
-  const page = searchParams.get("page")
-  if (page && page !== "1") {
-    params.set("page", page)
+    const currentParamsString = searchParams.toString()
+    const newParamsString = params.toString()
+
+    if (currentParamsString !== newParamsString) {
+      setSearchParams(params)
+    }
+  }, [filters, searchParams, setSearchParams])
+
+  // ✅ Enhanced add to cart with optimistic updates
+  const handleAddToCart = async (product) => {
+    try {
+      if (!product.sizes || product.sizes.length === 0) {
+        toast.error(`${product.name} has no available sizes.`)
+        return
+      }
+
+      if (!product.colors || product.colors.length === 0) {
+        toast.error(`${product.name} has no available colors.`)
+        return
+      }
+
+      const defaultSize = product.sizes[0].size
+      const defaultColor = product.colors[0].name
+
+      const payload = {
+        productId: product._id,
+        quantity: 1,
+        size: defaultSize,
+        color: defaultColor,
+      }
+
+      // ✅ Optimistic update for immediate UI feedback
+      dispatch(
+        optimisticAddToCart({
+          product,
+          quantity: 1,
+          size: defaultSize,
+          color: defaultColor,
+        }),
+      )
+
+      // ✅ Show immediate success feedback
+      toast.success(`${product.name} added to cart!`)
+
+      // ✅ Visual feedback on cart icon
+      const bagElement = document.querySelector("#bag")
+      if (bagElement) {
+        bagElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          bagElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      // ✅ Then sync with server
+      await dispatch(addToCart(payload)).unwrap()
+    } catch (error) {
+      console.error("Add to cart error:", error)
+      toast.error(error?.message || "Failed to add to cart")
+    }
   }
 
-  const currentParamsString = searchParams.toString()
-  const newParamsString = params.toString()
-  if (currentParamsString !== newParamsString) {
-    setSearchParams(params)
-  }
-}, [filters, searchParams, setSearchParams])
-
-const handleAddToCart = (product) => {
-  if (!user) {
-    toast.error("Please log in to add items to your cart.")
-    navigate("/login")
-    return
-  }
-const bag = document.getElementById("bag");
-  if (bag) bag.click();
-  if (!product.sizes || product.sizes.length === 0) {
-    toast.error(`${product.name} has no available sizes.`)
-    return
-  }
-
-  if (!product.colors || product.colors.length === 0) {
-    toast.error(`${product.name} has no available colors.`)
-    return
-  }
-
-  const defaultSize = product.sizes[0].size
-  const defaultColor = product.colors[0].name
-
-  dispatch(
-  addToCart({
-    productId: product._id,
-    quantity: 1,
-    size: defaultSize,
-    color: defaultColor,
-  })
-).then((res) => {
-  if (res.meta.requestStatus === "fulfilled") {
-    dispatch(fetchCart()) // ✅ Refresh cart after successful add
-    toast.success(`${product.name} added to cart!`)
-  } else {
-    toast.error("Failed to add to cart.")
-  }
-})
-.catch((err) => {
-  toast.error(err?.message || "Something went wrong.")
-})
-
-}
   // Handle filter change - merge new filters with existing
   const handleFilterChange = (newFilters) => {
     dispatch(setFilters({ ...filters, ...newFilters }))
@@ -252,6 +262,7 @@ const bag = document.getElementById("bag");
             </button>
           </div>
         </div>
+
         {/* Active Filters */}
         {getActiveFiltersCount() > 0 && (
           <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -300,6 +311,7 @@ const bag = document.getElementById("bag");
             </button>
           </div>
         )}
+
         <div className="flex flex-col gap-8 md:flex-row">
           {/* Desktop Filters Sidebar */}
           <div className="flex-shrink-0 hidden w-64 md:block">
@@ -310,6 +322,7 @@ const bag = document.getElementById("bag");
               onClearFilters={clearAllFilters}
             />
           </div>
+
           {/* Products Grid/List */}
           <div className="flex-1">
             {isLoading ? (
@@ -350,15 +363,12 @@ const bag = document.getElementById("bag");
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ delay: index * 0.05 }}
                       >
-<ProductCard
-  product={product}
-  viewMode={viewMode}
-  onAddToCart={() => handleAddToCart(product)}
-/>
+                        <ProductCard product={product} viewMode={viewMode} />
                       </motion.div>
                     ))}
                   </AnimatePresence>
                 </motion.div>
+
                 {/* Pagination */}
                 {pagination && pagination.pages > 1 && (
                   <div className="flex items-center justify-center mt-12 space-x-2">
@@ -399,6 +409,7 @@ const bag = document.getElementById("bag");
           </div>
         </div>
       </div>
+
       {/* Mobile Filters Modal */}
       <AnimatePresence>
         {showFilters && (
@@ -450,4 +461,5 @@ const bag = document.getElementById("bag");
     </div>
   )
 }
+
 export default ProductsPage

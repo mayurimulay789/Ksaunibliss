@@ -1,10 +1,19 @@
 "use client"
+
 import { motion } from "framer-motion"
 import { Heart, ShoppingBag, Eye, Star } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
 import { useNavigate } from "react-router-dom"
-import { addToCart } from "../store/slices/cartSlice" // Update path if needed
+import { addToCart, optimisticAddToCart, selectIsAddingToCart } from "../store/slices/cartSlice"
+import {
+  addToWishlist,
+  removeFromWishlist,
+  optimisticAddToWishlist,
+  optimisticRemoveFromWishlist,
+  selectIsAddingToWishlist,
+  selectIsRemovingFromWishlist,
+} from "../store/slices/wishlistSlice"
 import toast from "react-hot-toast"
 
 const ProductCard = ({
@@ -16,51 +25,112 @@ const ProductCard = ({
 }) => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
+
   const { user } = useSelector((state) => state.auth)
+  const { items: wishlistItems } = useSelector((state) => state.wishlist)
 
-  const handleAddToCart = () => {
-    const bag = document.getElementById("bag");
-  if (bag) bag.click();
-    if (!user) {
-      toast.error("Please log in to add items to your cart.")
-      navigate("/login")
-      return
-    }
+  // ✅ Use selectors for better performance
+  const isAddingToCart = useSelector(selectIsAddingToCart)
+  const isAddingToWishlist = useSelector(selectIsAddingToWishlist)
+  const isRemovingFromWishlist = useSelector(selectIsRemovingFromWishlist)
 
-    if (!product.sizes || product.sizes.length === 0) {
-      toast.error(`${product.name} has no available sizes.`)
-      return
-    }
+  // ✅ Check if product is in wishlist
+  const productInWishlist = wishlistItems.some((item) => item._id === product._id)
 
-    if (!product.colors || product.colors.length === 0) {
-      toast.error(`${product.name} has no available colors.`)
-      return
-    }
+  // ✅ Enhanced handleAddToCart with optimistic updates
+  const handleAddToCart = async () => {
+    try {
+      if (!product.sizes || product.sizes.length === 0) {
+        toast.error(`${product.name} has no available sizes.`)
+        return
+      }
 
-    const defaultSize = product.sizes[0].size
-    const defaultColor = product.colors[0].name
+      if (!product.colors || product.colors.length === 0) {
+        toast.error(`${product.name} has no available colors.`)
+        return
+      }
 
-    dispatch(
-      addToCart({
+      const defaultSize = product.sizes[0].size
+      const defaultColor = product.colors[0].name
+
+      const payload = {
         productId: product._id,
         quantity: 1,
         size: defaultSize,
         color: defaultColor,
-      })
-    )
-      .unwrap()
-      .then(() => {
-        toast.success(`${product.name} added to cart!`)
-      })
-      .catch((err) => {
-        toast.error(err?.message || "Failed to add to cart.")
-      })
+      }
+
+      // ✅ Optimistic update for immediate UI feedback
+      dispatch(
+        optimisticAddToCart({
+          product,
+          quantity: 1,
+          size: defaultSize,
+          color: defaultColor,
+        }),
+      )
+
+      // ✅ Show immediate success feedback
+      toast.success(`${product.name} added to cart!`)
+
+      // ✅ Visual feedback on cart icon
+      const bagElement = document.querySelector("#bag")
+      if (bagElement) {
+        bagElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          bagElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      // ✅ Then sync with server
+      await dispatch(addToCart(payload)).unwrap()
+    } catch (err) {
+      console.error("Add to cart error:", err)
+      toast.error(err?.message || "Failed to add to cart.")
+    }
+  }
+
+  // ✅ Enhanced wishlist toggle with optimistic updates
+  const handleWishlistToggle = async () => {
+    try {
+      if (productInWishlist) {
+        // ✅ Optimistic remove
+        dispatch(optimisticRemoveFromWishlist(product._id))
+        toast.success(`${product.name} removed from wishlist!`)
+
+        // ✅ Then sync with server
+        await dispatch(removeFromWishlist(product._id)).unwrap()
+      } else {
+        // ✅ Optimistic add
+        dispatch(optimisticAddToWishlist(product))
+        toast.success(`${product.name} added to wishlist!`)
+
+        // ✅ Then sync with server
+        await dispatch(addToWishlist(product)).unwrap()
+      }
+
+      // ✅ Visual feedback on wishlist icon
+      const wishElement = document.querySelector("#wish")
+      if (wishElement) {
+        wishElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          wishElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      // ✅ Call parent callback if provided
+      onWishlistToggle()
+    } catch (err) {
+      console.error("Wishlist toggle error:", err)
+      toast.error(err?.message || "Failed to update wishlist.")
+    }
   }
 
   const discountPercentage =
     product.originalPrice && product.originalPrice > product.price
       ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
       : 0
+
   const stockStatus = product.stock === 0 ? "Out of Stock" : product.stock < 5 ? `Only ${product.stock} left!` : null
 
   // Re-defined classes with Ksauni colors
@@ -74,7 +144,7 @@ const ProductCard = ({
     return (
       <motion.div
         whileHover={{ y: -5, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }}
-        className="overflow-hidden transition-all duration-300 bg-white shadow-md rounded-xl hover:shadow-lg group" // Changed to rounded-xl
+        className="overflow-hidden transition-all duration-300 bg-white shadow-md rounded-xl hover:shadow-lg group"
       >
         <div className="flex flex-col sm:flex-row">
           {/* Product Image */}
@@ -98,14 +168,15 @@ const ProductCard = ({
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={onWishlistToggle}
-                className={`p-2 rounded-full shadow-md transition-colors ${
-                  isInWishlist
+                onClick={handleWishlistToggle}
+                disabled={isAddingToWishlist || isRemovingFromWishlist}
+                className={`p-2 rounded-full shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  productInWishlist
                     ? "bg-ksauni-red text-white"
                     : "bg-white text-gray-600 hover:bg-ksauni-red/10 hover:text-ksauni-red"
                 }`}
               >
-                <Heart className={`w-4 h-4 ${isInWishlist ? "fill-current" : ""}`} />
+                <Heart className={`w-4 h-4 ${productInWishlist ? "fill-current" : ""}`} />
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.1 }}
@@ -117,17 +188,18 @@ const ProductCard = ({
               </motion.button>
             </div>
           </div>
+
           {/* Product Details */}
           <div className="flex-1 p-4 sm:p-6">
             <div className="flex items-start justify-between mb-2">
-<Link to={`/product/${product.slug || product._id}`}>
+              <Link to={`/product/${product.slug || product._id}`}>
                 <h3 className="text-lg font-semibold text-gray-800 transition-colors hover:text-ksauni-red line-clamp-2">
                   {product.name}
                 </h3>
               </Link>
             </div>
             {/* Category */}
-{product.category?.name && <p className="mb-2 text-sm text-gray-500">{product.category.name}</p>}
+            {product.category?.name && <p className="mb-2 text-sm text-gray-500">{product.category.name}</p>}
             {/* Rating */}
             {product.rating && product.rating.average > 0 && (
               <div className="flex items-center mb-3">
@@ -149,20 +221,23 @@ const ProductCard = ({
             {/* Price and Actions */}
             <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
               <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold text-gray-800">{product.price.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
-</span>
+                <span className="text-xl font-bold text-gray-800">
+                  {product.price.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                </span>
                 {product.originalPrice && product.originalPrice > product.price && (
                   <span className="text-sm text-gray-500 line-through">₹{product.originalPrice}</span>
                 )}
               </div>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleAddToCart}
-                disabled={product.stock === 0}
+                disabled={product.stock === 0 || isAddingToCart}
                 className={`${commonButtonClasses} bg-ksauni-red hover:bg-ksauni-dark-red disabled:bg-gray-300`}
               >
                 <ShoppingBag className="w-4 h-4" />
-                <span>{product.stock === 0 ? "Out of Stock" : "Add to Cart"}</span>
-              </button>
+                <span>{product.stock === 0 ? "Out of Stock" : isAddingToCart ? "Adding..." : "Add to Cart"}</span>
+              </motion.button>
             </div>
             {/* Stock Status */}
             {stockStatus && (
@@ -180,7 +255,7 @@ const ProductCard = ({
   return (
     <motion.div
       whileHover={{ y: -5, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }}
-      className="overflow-hidden transition-all duration-300 bg-white shadow-md rounded-xl group hover:shadow-xl" // Changed to rounded-xl
+      className="overflow-hidden transition-all duration-300 bg-white shadow-md rounded-xl group hover:shadow-xl"
     >
       {/* Product Image */}
       <div className="relative aspect-[3/4] overflow-hidden">
@@ -203,14 +278,15 @@ const ProductCard = ({
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            onClick={onWishlistToggle}
-            className={`p-2 rounded-full shadow-md transition-colors ${
-              isInWishlist
+            onClick={handleWishlistToggle}
+            disabled={isAddingToWishlist || isRemovingFromWishlist}
+            className={`p-2 rounded-full shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              productInWishlist
                 ? "bg-ksauni-red text-white"
                 : "bg-white text-gray-600 hover:bg-ksauni-red/10 hover:text-ksauni-red"
             }`}
           >
-            <Heart className={`w-4 h-4 ${isInWishlist ? "fill-current" : ""}`} />
+            <Heart className={`w-4 h-4 ${productInWishlist ? "fill-current" : ""}`} />
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -223,17 +299,19 @@ const ProductCard = ({
         </div>
         {/* Quick Add Button */}
         <div className="absolute transition-opacity duration-300 opacity-0 bottom-3 left-3 right-3 group-hover:opacity-100">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleAddToCart}
-
-            disabled={product.stock === 0}
-            className={`${commonButtonClasses} bg-ksauni-red hover:bg-ksauni-dark-red disabled:bg-gray-300`}
+            disabled={product.stock === 0 || isAddingToCart}
+            className={`${commonButtonClasses} bg-ksauni-red hover:bg-ksauni-dark-red disabled:bg-gray-300 w-full justify-center`}
           >
             <ShoppingBag className="w-4 h-4" />
-            <span>{product.stock === 0 ? "Out of Stock" : "Quick Add"}</span>
-          </button>
+            <span>{product.stock === 0 ? "Out of Stock" : isAddingToCart ? "Adding..." : "Quick Add"}</span>
+          </motion.button>
         </div>
       </div>
+
       {/* Product Info */}
       <div className="p-4">
         <Link to={`/product/${product._id}`}>
@@ -276,4 +354,5 @@ const ProductCard = ({
     </motion.div>
   )
 }
+
 export default ProductCard

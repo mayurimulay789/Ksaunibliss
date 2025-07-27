@@ -14,10 +14,10 @@ const ProtectedRoute = ({ children, adminOnly = false, digitalMarketerOnly = fal
 
   useEffect(() => {
     // Check authentication status if we have a token but no user data
-    if (token && !user && !isLoading) {
+    if ( !user && !isLoading) {
       dispatch(checkAuth())
     }
-  }, [dispatch, token, user, isLoading])
+  }, [dispatch,  user, isLoading])
 
   // Show loading while checking authentication
   if (isLoading) {

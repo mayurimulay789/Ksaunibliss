@@ -1,90 +1,117 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
-import { motion, AnimatePresence } from "framer-motion";
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
+import { useSelector, useDispatch } from "react-redux"
+import { motion, AnimatePresence } from "framer-motion"
+import { Menu, X, ChevronDown, Search, ShoppingBag, User, Heart, Mic, Clock, Trash2 } from "lucide-react"
+import { useDebounce } from "use-debounce"
+import axios from "axios"
+import { logout } from "../store/slices/authSlice"
+import { fetchCategories } from "../store/slices/categorySlice"
+import { fetchCart, selectCartTotalQuantity } from "../store/slices/cartSlice"
+import { fetchWishlist, selectWishlistCount } from "../store/slices/wishlistSlice"
 import {
-  Menu,
-  X,
-  ChevronDown,
-  Search,
-  ShoppingBag,
-  User,
-  Heart,
-} from "lucide-react";
-import axios from "axios";
-import { logout } from "../store/slices/authSlice";
-import { fetchCategories } from "../store/slices/categorySlice";
-import FullTextSearchWithSuggestions from "./FullTextSearchWithSuggestions";
+  getSearchSuggestions,
+  addRecentSearch,
+  removeRecentSearch,
+  clearRecentSearches,
+} from "../store/slices/searchSlice"
 
 const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [hoveredMenu, setHoveredMenu] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [productPreviews, setProductPreviews] = useState({});
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [hoveredMenu, setHoveredMenu] = useState(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [productPreviews, setProductPreviews] = useState({})
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
 
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const searchRef = useRef(null)
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
 
-  const { user, token } = useSelector((state) => state.auth || {});
-  const { categories } = useSelector((state) => state.categories || {});
-  const { items: cartItems } = useSelector((state) => state.cart || { items: [] });
-  const { items: wishlistItems } = useSelector((state) => state.wishlist || { items: [] });
+  const { user, token } = useSelector((state) => state.auth || {})
+  const { categories } = useSelector((state) => state.categories || {})
+  const { suggestions, recentSearches, suggestionsLoading } = useSelector((state) => state.search || {})
+
+  // Use selectors for better performance
+  const cartTotalQuantity = useSelector(selectCartTotalQuantity)
+  const wishlistCount = useSelector(selectWishlistCount)
+
+  // Debounce search query for suggestions
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 300)
+
+  // Fetch cart and wishlist on component mount and when user changes
+  useEffect(() => {
+    if (token) {
+      dispatch(fetchCart())
+      dispatch(fetchWishlist())
+    }
+  }, [dispatch, token])
 
   useEffect(() => {
-    dispatch(fetchCategories({ showOnHomepage: true }));
-  }, [dispatch]);
+    dispatch(fetchCategories({ showOnHomepage: true }))
+  }, [dispatch])
+
+  // Fetch search suggestions when debounced query changes
+  useEffect(() => {
+    if (debouncedSearchQuery.trim() && searchFocused) {
+      dispatch(getSearchSuggestions(debouncedSearchQuery.trim()))
+    }
+  }, [debouncedSearchQuery, searchFocused, dispatch])
+
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowSearchDropdown(false)
+        setSearchFocused(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   const navigateToCategory = (categoryId = "") => {
-    const base = "/products?priceRange=0%2C10000&sizes=&colors=&sortBy=newest";
-    navigate(categoryId ? `${base}&category=${categoryId}` : base);
-  };
+    const base = "/products?priceRange=0%2C10000&sizes=&colors=&sortBy=newest"
+    navigate(categoryId ? `${base}&category=${categoryId}` : base)
+  }
 
-  const groupedCategories = {
-    Men: [],
-    Women: [],
-    Kids: [],
-    Others: [],
-  };
-
-  (categories || []).forEach((cat) => {
-    const name = cat.name.toLowerCase();
+  const groupedCategories = { Men: [], Women: [], Kids: [], Others: [] }
+  ;(categories || []).forEach((cat) => {
+    const name = cat.name.toLowerCase()
     if (name.includes("men") && !name.includes("women")) {
-      groupedCategories.Men.push(cat);
+      groupedCategories.Men.push(cat)
     } else if (name.includes("women")) {
-      groupedCategories.Women.push(cat);
+      groupedCategories.Women.push(cat)
     } else if (name.includes("kids")) {
-      groupedCategories.Kids.push(cat);
+      groupedCategories.Kids.push(cat)
     } else {
-      groupedCategories.Others.push(cat);
+      groupedCategories.Others.push(cat)
     }
-  });
+  })
 
   const fetchProductPreview = async (categoryId) => {
     if (!productPreviews[categoryId]) {
       try {
-        const { data } = await axios.get(
-          `/api/products?category=${categoryId}&priceRange=0%2C10000&page=1&limit=4`
-        );
+        const { data } = await axios.get(`/api/products?category=${categoryId}&priceRange=0%2C10000&page=1&limit=4`)
         if (data?.products) {
           setProductPreviews((prev) => ({
             ...prev,
             [categoryId]: data.products,
-          }));
+          }))
         }
       } catch (err) {
-        console.error("Failed to load preview for category:", categoryId);
+        console.error("Failed to load preview for category:", categoryId)
       }
     }
-  };
+  }
 
   const renderDropdown = (label, categoryList) => (
-    <div
-      className="relative"
-      onMouseEnter={() => setHoveredMenu(label)}
-      onMouseLeave={() => setHoveredMenu(null)}
-    >
-      <div className="flex items-center space-x-1 font-medium text-gray-700 cursor-pointer hover:text-pink-600">
+    <div className="relative" onMouseEnter={() => setHoveredMenu(label)} onMouseLeave={() => setHoveredMenu(null)}>
+      <div className="flex items-center space-x-1 font-medium text-gray-700 cursor-pointer hover:text-red-600">
         <span>{label}</span>
         <ChevronDown className="w-4 h-4" />
       </div>
@@ -97,14 +124,10 @@ const Navbar = () => {
             className="absolute top-full left-0 w-[400px] mt-2 bg-white border rounded shadow-lg z-50 p-4"
           >
             {categoryList.map((cat) => (
-              <div
-                key={cat._id}
-                className="mb-4"
-                onMouseEnter={() => fetchProductPreview(cat._id)}
-              >
+              <div key={cat._id} className="mb-4" onMouseEnter={() => fetchProductPreview(cat._id)}>
                 <div
                   onClick={() => navigateToCategory(cat._id)}
-                  className="mb-2 text-sm font-semibold text-pink-600 cursor-pointer"
+                  className="mb-2 text-sm font-semibold text-red-600 cursor-pointer"
                 >
                   {cat.name}
                 </div>
@@ -112,7 +135,7 @@ const Navbar = () => {
                   {(productPreviews[cat._id] || []).map((prod) => (
                     <img
                       key={prod._id}
-                      src={prod.images?.[0]?.url}
+                      src={prod.images?.[0]?.url || "/placeholder.svg"}
                       alt={prod.name}
                       className="object-cover w-16 h-16 transition rounded-md cursor-pointer hover:scale-105"
                       onClick={() => navigate(`/product/${prod._id}`)}
@@ -125,13 +148,54 @@ const Navbar = () => {
         )}
       </AnimatePresence>
     </div>
-  );
+  )
 
   const handleLogout = () => {
-    dispatch(logout());
-    setShowUserMenu(false);
-    navigate("/");
-  };
+    dispatch(logout())
+    setShowUserMenu(false)
+    navigate("/")
+  }
+
+  // ✅ Fixed search handler - navigate to /products with search param
+  const handleSearch = (e, query = searchQuery) => {
+    e?.preventDefault()
+    const searchTerm = query.trim()
+    if (searchTerm) {
+      // Add to recent searches
+      dispatch(addRecentSearch(searchTerm))
+
+      // ✅ Navigate to products page with search query (not /search)
+      navigate(`/products?search=${encodeURIComponent(searchTerm)}`)
+
+      // Close search dropdown and clear query
+      setShowSearchDropdown(false)
+      setSearchQuery("")
+      setSearchFocused(false)
+    }
+  }
+
+  // Handle search input focus
+  const handleSearchFocus = () => {
+    setSearchFocused(true)
+    setShowSearchDropdown(true)
+  }
+
+  // Handle suggestion click
+  const handleSuggestionClick = (suggestion) => {
+    setSearchQuery(suggestion)
+    handleSearch(null, suggestion)
+  }
+
+  // Handle recent search click
+  const handleRecentSearchClick = (recentSearch) => {
+    setSearchQuery(recentSearch)
+    handleSearch(null, recentSearch)
+  }
+
+  const searchVariants = {
+    focused: { scale: 1.02 },
+    unfocused: { scale: 1 },
+  }
 
   return (
     <motion.nav
@@ -141,73 +205,161 @@ const Navbar = () => {
       className="sticky top-0 z-50 bg-white shadow-md"
     >
       <div className="container px-4 mx-auto uppercase">
-        {/* Top Row */}
         <div className="flex items-center justify-between py-4">
-          <div
-            onClick={() => navigate("/")}
-            className="text-2xl font-bold text-red-600 cursor-pointer"
-          >
+          <div onClick={() => navigate("/")} className="text-2xl font-bold text-red-600 cursor-pointer">
             KsauniBliss
           </div>
 
-          {/* Search */}
-          <div className="justify-center flex-1 hidden max-w-md mx-10 md:flex">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (searchQuery.trim())
-                  navigate(`/products?search=${searchQuery}`);
-              }}
-              className="relative w-full"
+          {/* Enhanced Search Bar */}
+          <div className="flex justify-center flex-1">
+            <motion.div
+              ref={searchRef}
+              className="relative w-full max-w-sm"
+              variants={searchVariants}
+              animate={searchFocused ? "focused" : "unfocused"}
             >
-              <Search className="absolute w-4 h-4 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
-              {/* <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full py-2 pl-10 pr-4 border-2 border-gray-500 rounded-full outline-none focus:border-red-500"
-              /> */}
-              <FullTextSearchWithSuggestions/>
-            </form>
+              <form onSubmit={handleSearch}>
+                <Search className="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-4 top-1/2" />
+                <motion.input
+                  type="text"
+                  placeholder="What are you looking for?"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={handleSearchFocus}
+                  className="w-full py-2 pl-10 pr-10 text-sm placeholder-gray-400 transition-all duration-300 border border-gray-200 rounded-full outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-ksauni-red/20"
+                  whileFocus={{ scale: 1.02 }}
+                />
+                <Mic className="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 right-4 top-1/2" />
+              </form>
+
+              {/* Search Dropdown */}
+              <AnimatePresence>
+                {showSearchDropdown && searchFocused && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto"
+                  >
+                    {/* Recent Searches */}
+                    {recentSearches.length > 0 && !searchQuery && (
+                      <div className="p-4 border-b">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-gray-700">Recent Searches</h4>
+                          <button
+                            onClick={() => dispatch(clearRecentSearches())}
+                            className="text-xs text-gray-500 hover:text-gray-700"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {recentSearches.map((search, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer"
+                              onClick={() => handleRecentSearchClick(search)}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <Clock className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm text-gray-700">{search}</span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  dispatch(removeRecentSearch(search))
+                                }}
+                                className="p-1 text-gray-400 hover:text-gray-600"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Search Suggestions */}
+                    {searchQuery && (
+                      <div className="p-4">
+                        {suggestionsLoading ? (
+                          <div className="flex items-center justify-center py-4">
+                            <div className="w-5 h-5 border-2 border-gray-300 rounded-full border-t-ksauni-red animate-spin" />
+                          </div>
+                        ) : suggestions.length > 0 ? (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-gray-700 mb-3">Suggestions</h4>
+                            {suggestions.map((suggestion, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                                onClick={() => handleSuggestionClick(suggestion)}
+                              >
+                                <Search className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm text-gray-700">{suggestion}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="py-4 text-center text-sm text-gray-500">No suggestions found</div>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           </div>
 
-          {/* Icons */}
           <div className="flex items-center space-x-6">
-            {/* Wishlist */}
             <div
               onClick={() => navigate("/wishlist")}
-              className="relative items-center hidden space-x-1 text-gray-700 cursor-pointer md:flex hover:text-pink-600"
+              className="relative items-center hidden space-x-1 text-gray-700 cursor-pointer md:flex hover:text-red-600"
             >
               <Heart className="w-5 h-5" />
-              <span id="wish" className="text-sm">Wishlist</span>
-              {wishlistItems.length > 0 && (
-                <span className="absolute flex items-center justify-center w-5 h-5 text-xs text-white bg-pink-500 rounded-full -top-2 -right-2">
-                  {wishlistItems.length}
-                </span>
+              <span className="text-sm" id="wish">
+                Wishlist
+              </span>
+              {wishlistCount > 0 && (
+                <motion.span
+                  key={wishlistCount}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="absolute flex items-center justify-center w-5 h-5 text-xs text-white bg-red-500 rounded-full -top-2 -right-2"
+                >
+                  {wishlistCount}
+                </motion.span>
               )}
             </div>
 
-            {/* Cart */}
             <div
               onClick={() => navigate("/cart")}
-              className="relative flex items-center space-x-1 text-gray-700 cursor-pointer hover:text-pink-600"
+              className="relative flex items-center space-x-1 text-gray-700 cursor-pointer hover:text-red-600"
             >
               <ShoppingBag className="w-5 h-5" />
-              <span id="bag" className="hidden text-sm md:block">Cart</span>
-              {cartItems.length > 0 && (
-                <span className="absolute flex items-center justify-center w-5 h-5 text-xs text-white bg-red-500 rounded-full -top-2 -right-2">
-                  {cartItems.reduce((t, i) => t + (i.quantity || 0), 0)}
-                </span>
+              <span className="hidden text-sm md:block" id="bag">
+                Cart
+              </span>
+              {cartTotalQuantity > 0 && (
+                <motion.span
+                  key={cartTotalQuantity}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="absolute flex items-center justify-center w-5 h-5 text-xs text-white bg-red-500 rounded-full -top-2 -right-2"
+                >
+                  {cartTotalQuantity}
+                </motion.span>
               )}
             </div>
 
-            {/* Profile / Login */}
-            <div className="relative items-center hidden text-gray-700 cursor-pointer md:flex hover:text-pink-600">
+            <div className="relative items-center hidden text-gray-700 cursor-pointer md:flex hover:text-red-600">
               <User className="w-5 h-5 mr-1" />
               <span
                 onClick={() => {
-                  if (!token) navigate("/login");
-                  else setShowUserMenu(!showUserMenu);
+                  if (!token) navigate("/login")
+                  else setShowUserMenu(!showUserMenu)
                 }}
                 className="text-sm"
               >
@@ -224,29 +376,29 @@ const Navbar = () => {
                   >
                     <div
                       onClick={() => {
-                        navigate("/profile");
-                        setShowUserMenu(false);
+                        navigate("/profile")
+                        setShowUserMenu(false)
                       }}
-                      className="px-4 py-2 text-sm hover:bg-pink-50"
+                      className="px-4 py-2 text-sm hover:bg-red-50"
                     >
                       My Profile
                     </div>
                     <div
                       onClick={() => {
-                        navigate("/orders");
-                        setShowUserMenu(false);
+                        navigate("/orders")
+                        setShowUserMenu(false)
                       }}
-                      className="px-4 py-2 text-sm hover:bg-pink-50"
+                      className="px-4 py-2 text-sm hover:bg-red-50"
                     >
                       My Orders
                     </div>
                     {user?.role === "admin" && (
                       <div
                         onClick={() => {
-                          navigate("/admin");
-                          setShowUserMenu(false);
+                          navigate("/admin")
+                          setShowUserMenu(false)
                         }}
-                        className="px-4 py-2 text-sm hover:bg-pink-50"
+                        className="px-4 py-2 text-sm hover:bg-red-50"
                       >
                         Admin Dashboard
                       </div>
@@ -254,18 +406,15 @@ const Navbar = () => {
                     {user?.role === "digitalMarketer" && (
                       <div
                         onClick={() => {
-                          navigate("/digitalMarketer");
-                          setShowUserMenu(false);
+                          navigate("/digitalMarketer")
+                          setShowUserMenu(false)
                         }}
-                        className="px-4 py-2 text-sm hover:bg-pink-50"
+                        className="px-4 py-2 text-sm hover:bg-red-50"
                       >
                         Marketer Dashboard
                       </div>
                     )}
-                    <div
-                      onClick={handleLogout}
-                      className="px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                    >
+                    <div onClick={handleLogout} className="px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                       Logout
                     </div>
                   </motion.div>
@@ -273,17 +422,12 @@ const Navbar = () => {
               </AnimatePresence>
             </div>
 
-            {/* Mobile Menu */}
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2 md:hidden"
-            >
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 md:hidden">
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        {/* Desktop Navigation */}
         <div className="justify-center hidden py-3 space-x-6 border-t md:flex">
           {renderDropdown("Men", groupedCategories.Men)}
           {renderDropdown("Women", groupedCategories.Women)}
@@ -291,7 +435,7 @@ const Navbar = () => {
           {groupedCategories.Others.map((cat) => (
             <div
               key={cat._id}
-              className="font-medium text-gray-700 cursor-pointer hover:text-pink-600"
+              className="font-medium text-gray-700 cursor-pointer hover:text-red-600"
               onClick={() => navigateToCategory(cat._id)}
             >
               {cat.name}
@@ -300,7 +444,7 @@ const Navbar = () => {
         </div>
       </div>
     </motion.nav>
-  );
-};
+  )
+}
 
-export default Navbar;
+export default Navbar

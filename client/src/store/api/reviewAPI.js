@@ -1,63 +1,41 @@
-import axios from "axios";
+import axios from "axios"
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 
-// Create axios instance with interceptors
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+  headers: { "Content-Type": "application/json" },
+})
 
-// Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
+    const token = localStorage.getItem("fashionhub_token")
+    if (token) config.headers.Authorization = `Bearer ${token}`
+    return config
   },
-  (error) => {
-    return Promise.reject(error);
-  },
-);
+  (error) => Promise.reject(error),
+)
 
-// Response interceptor for error handling
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      window.location.href = "/login";
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("token")
+      window.location.href = "/login"
     }
-    return Promise.reject(error);
+    return Promise.reject(err)
   },
-);
+)
 
 const reviewAPI = {
-  // Get product reviews
   getProductReviews: (productId) => api.get(`/reviews/product/${productId}`),
-
-  // Create review
-  createReview: (reviewData) => api.post("/reviews", reviewData),
-
-  // Update review
-  updateReview: (reviewId, reviewData) => api.put(`/reviews/${reviewId}`, reviewData),
-
-  // Delete review
-  deleteReview: (reviewId) => api.delete(`/reviews/${reviewId}`),
-
-  // Get user reviews
+  createReview: (data) => api.post("/reviews", data),
+  updateReview: (id, data) => api.put(`/reviews/${id}`, data),
+  deleteReview: (id) => api.delete(`/reviews/${id}`),
   getUserReviews: () => api.get("/reviews/user"),
+  toggleReviewLike: (id) => api.post(`/reviews/${id}/like`),
+  reportReview: (id, reason) => api.post(`/reviews/${id}/report`, { reason }),
+  getReviewById: (id) => api.get(`/reviews/${id}`),
+}
 
-  // Toggle helpful vote
-  toggleReviewHelpful: (reviewId) => api.post(`/reviews/${reviewId}/helpful`),
-
-  // Report review
-  reportReview: (reviewId, { reason, description }) =>
-    api.post(`/reviews/${reviewId}/report`, { reason, description }),
-};
-
-export default reviewAPI;
+export default reviewAPI

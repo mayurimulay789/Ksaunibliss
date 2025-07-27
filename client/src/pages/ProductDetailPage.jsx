@@ -1,3 +1,4 @@
+"use client"
 
 import { useState, useEffect } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
@@ -19,9 +20,15 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { fetchProductById } from "../store/slices/productSlice"
-import { addToCart } from "../store/slices/cartSlice"
-import { addToWishlist, removeFromWishlist } from "../store/slices/wishlistSlice"
-
+import { addToCart, optimisticAddToCart, selectIsAddingToCart } from "../store/slices/cartSlice"
+import {
+  addToWishlist,
+  removeFromWishlist,
+  optimisticAddToWishlist,
+  optimisticRemoveFromWishlist,
+  selectIsAddingToWishlist,
+  selectIsRemovingFromWishlist,
+} from "../store/slices/wishlistSlice"
 import ProductReviews from "../components/ProductReviews"
 import RelatedProducts from "../components/RelatedProducts"
 import LoadingSpinner from "../components/LoadingSpinner"
@@ -36,12 +43,16 @@ const ProductDetailPage = () => {
   const { items: wishlistItems } = useSelector((state) => state.wishlist)
   const { isAuthenticated } = useSelector((state) => state.auth)
 
+  // ✅ Use selectors for better performance
+  const isAddingToCart = useSelector(selectIsAddingToCart)
+  const isAddingToWishlist = useSelector(selectIsAddingToWishlist)
+  const isRemovingFromWishlist = useSelector(selectIsRemovingFromWishlist)
+
   const [selectedImage, setSelectedImage] = useState(0)
   const [selectedSize, setSelectedSize] = useState("")
   const [selectedColor, setSelectedColor] = useState("")
   const [quantity, setQuantity] = useState(1)
   const [showImageModal, setShowImageModal] = useState(false)
-  const [addingToCart, setAddingToCart] = useState(false)
   const [showSizeGuide, setShowSizeGuide] = useState(false)
 
   const isInWishlist = wishlistItems.some((item) => item._id === currentProduct?._id)
@@ -64,61 +75,86 @@ const ProductDetailPage = () => {
     }
   }, [currentProduct])
 
+  // ✅ Enhanced handleAddToCart with optimistic updates
   const handleAddToCart = async () => {
-    // if (!isAuthenticated) {
-    //   navigate("/login")
-    //   return
-    // }
-
-const bag = document.getElementById("bag");
-  if (bag) bag.click();
-    if (currentProduct.sizes?.length > 0 && !selectedSize) {
-      toast.error("Please select a size")
-      return
-    }
-
-    if (currentProduct.colors?.length > 0 && !selectedColor) {
-      toast.error("Please select a color")
-      return
-    }
-
-    setAddingToCart(true)
-
     try {
-      await dispatch(
-        addToCart({
-          productId: currentProduct._id,
+      if (currentProduct.sizes?.length > 0 && !selectedSize) {
+        toast.error("Please select a size")
+        return
+      }
+
+      if (currentProduct.colors?.length > 0 && !selectedColor) {
+        toast.error("Please select a color")
+        return
+      }
+
+      const payload = {
+        productId: currentProduct._id,
+        quantity,
+        size: selectedSize,
+        color: selectedColor,
+      }
+
+      // ✅ Optimistic update for immediate UI feedback
+      dispatch(
+        optimisticAddToCart({
+          product: currentProduct,
           quantity,
           size: selectedSize,
           color: selectedColor,
         }),
-      ).unwrap()
+      )
 
-      toast.success("Added to cart!")
+      // ✅ Show immediate success feedback
+      toast.success(`${currentProduct.name} added to cart!`)
+
+      // ✅ Visual feedback on cart icon
+      const bagElement = document.querySelector("#bag")
+      if (bagElement) {
+        bagElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          bagElement.style.transform = "scale(1)"
+        }, 200)
+      }
+
+      // ✅ Then sync with server
+      await dispatch(addToCart(payload)).unwrap()
     } catch (error) {
-      toast.error(error)
-    } finally {
-      setAddingToCart(false)
+      console.error("Add to cart error:", error)
+      toast.error(error?.message || "Failed to add item to cart")
     }
   }
 
+  // ✅ Enhanced handleWishlistToggle with optimistic updates
   const handleWishlistToggle = async () => {
-    // if (!isAuthenticated) {
-    //   navigate("/login")
-    //   return
-    // }
- const wish = document.getElementById("wish");
-  if (wish) wish.click();
     try {
       if (isInWishlist) {
+        // ✅ Optimistic remove
+        dispatch(optimisticRemoveFromWishlist(currentProduct._id))
+        toast.success(`${currentProduct.name} removed from wishlist!`)
+
+        // ✅ Then sync with server
         await dispatch(removeFromWishlist(currentProduct._id)).unwrap()
-        toast.success("Removed from wishlist")
       } else {
-        await dispatch(addToWishlist(currentProduct._id)).unwrap()
-        toast.success("Added to wishlist")
+        // ✅ Optimistic add
+        dispatch(optimisticAddToWishlist(currentProduct))
+        toast.success(`${currentProduct.name} added to wishlist!`)
+
+        // ✅ Then sync with server
+        await dispatch(addToWishlist(currentProduct)).unwrap()
+      }
+
+      // ✅ Visual feedback on wishlist icon
+      const wishElement = document.querySelector("#wish")
+      if (wishElement) {
+        wishElement.style.transform = "scale(1.2)"
+        setTimeout(() => {
+          wishElement.style.transform = "scale(1)"
+        }, 200)
       }
     } catch (error) {
-      toast.error(error)
+      console.error("Wishlist toggle error:", error)
+      toast.error(error?.message || "Failed to update wishlist")
     }
   }
 
@@ -184,7 +220,7 @@ const bag = document.getElementById("bag");
           <p className="mb-8 text-gray-600">The product you're looking for doesn't exist or has been removed.</p>
           <Link
             to="/products"
-            className="px-6 py-3 text-white transition-colors bg-pink-600 rounded-lg hover:bg-pink-700"
+            className="px-6 py-3 text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700"
           >
             Browse Products
           </Link>
@@ -195,7 +231,6 @@ const bag = document.getElementById("bag");
 
   return (
     <div className="min-h-screen bg-white">
-
       <div className="container px-4 py-8 mx-auto">
         {/* Breadcrumb */}
         <nav className="flex items-center mb-8 space-x-2 text-sm text-gray-600">
@@ -207,7 +242,7 @@ const bag = document.getElementById("bag");
             Products
           </Link>
           <span>/</span>
-          <Link to={`/products/${currentProduct.category?.slug}`} className="hover:text-pink-600">
+          <Link to={`/products/${currentProduct.category?.slug}`} className="hover:text-red-600">
             {currentProduct.category?.name}
           </Link>
           <span>/</span>
@@ -225,32 +260,33 @@ const bag = document.getElementById("bag");
                 className="object-cover w-full h-full cursor-zoom-in"
                 onClick={() => setShowImageModal(true)}
               />
-
               {/* Navigation Arrows */}
               {currentProduct.images?.length > 1 && (
                 <>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={prevImage}
                     className="absolute p-2 transition-all transform -translate-y-1/2 bg-white rounded-full shadow-lg opacity-0 left-4 top-1/2 bg-opacity-80 hover:bg-opacity-100 group-hover:opacity-100"
                   >
                     <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={nextImage}
                     className="absolute p-2 transition-all transform -translate-y-1/2 bg-white rounded-full shadow-lg opacity-0 right-4 top-1/2 bg-opacity-80 hover:bg-opacity-100 group-hover:opacity-100"
                   >
                     <ChevronRight className="w-5 h-5" />
-                  </button>
+                  </motion.button>
                 </>
               )}
-
               {/* Discount Badge */}
               {getDiscountPercentage() > 0 && (
                 <div className="absolute px-3 py-1 text-sm font-medium text-white bg-red-500 rounded-full top-4 left-4">
                   {getDiscountPercentage()}% OFF
                 </div>
               )}
-
               {/* Stock Badge */}
               {getSelectedSizeStock() === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -263,11 +299,13 @@ const bag = document.getElementById("bag");
             {currentProduct.images?.length > 1 && (
               <div className="flex pb-2 space-x-2 overflow-x-auto">
                 {currentProduct.images.map((image, index) => (
-                  <button
+                  <motion.button
                     key={index}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedImage(index)}
                     className={`flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedImage === index ? "border-pink-500" : "border-transparent hover:border-gray-300"
+                      selectedImage === index ? "border-red-500" : "border-transparent hover:border-gray-300"
                     }`}
                   >
                     <img
@@ -275,7 +313,7 @@ const bag = document.getElementById("bag");
                       alt={`${currentProduct.name} ${index + 1}`}
                       className="object-cover w-full h-full"
                     />
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             )}
@@ -328,12 +366,14 @@ const bag = document.getElementById("bag");
                 <h3 className="mb-3 text-lg font-semibold text-gray-800">Color</h3>
                 <div className="flex flex-wrap gap-3">
                   {currentProduct.colors.map((color) => (
-                    <button
+                    <motion.button
                       key={color.name}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => setSelectedColor(color.name)}
                       className={`flex items-center space-x-2 px-4 py-2 border-2 rounded-lg transition-colors ${
                         selectedColor === color.name
-                          ? "border-pink-500 bg-pink-50"
+                          ? "border-red-500 bg-red-50"
                           : "border-gray-300 hover:border-gray-400"
                       }`}
                     >
@@ -342,7 +382,7 @@ const bag = document.getElementById("bag");
                         style={{ backgroundColor: color.hex || color.name.toLowerCase() }}
                       />
                       <span className="text-sm font-medium">{color.name}</span>
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
@@ -355,16 +395,18 @@ const bag = document.getElementById("bag");
                   <h3 className="text-lg font-semibold text-gray-800">Size</h3>
                   <button
                     onClick={() => setShowSizeGuide(true)}
-                    className="text-sm font-medium text-pink-600 hover:text-pink-700"
+                    className="text-sm font-medium text-red-600 hover:text-red-700"
                   >
                     Size Guide
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {currentProduct.sizes.map((sizeData) => (
-                    <button
-key={sizeData.size}               
-       onClick={() => setSelectedSize(sizeData.size)}
+                    <motion.button
+                      key={sizeData.size}
+                      whileHover={{ scale: sizeData.stock > 0 ? 1.05 : 1 }}
+                      whileTap={{ scale: sizeData.stock > 0 ? 0.95 : 1 }}
+                      onClick={() => setSelectedSize(sizeData.size)}
                       disabled={sizeData.stock === 0}
                       className={`px-4 py-2 border-2 rounded-lg transition-colors font-medium ${
                         selectedSize === sizeData.size
@@ -376,7 +418,7 @@ key={sizeData.size}
                     >
                       {sizeData.size}
                       {sizeData.stock === 0 && <span className="block text-xs">Out of Stock</span>}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
@@ -387,20 +429,24 @@ key={sizeData.size}
               <h3 className="mb-3 text-lg font-semibold text-gray-800">Quantity</h3>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center border border-gray-300 rounded-lg">
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     className="p-2 transition-colors hover:bg-gray-50"
                   >
                     <Minus className="w-4 h-4" />
-                  </button>
+                  </motion.button>
                   <span className="px-4 py-2 font-medium">{quantity}</span>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={() => setQuantity(Math.min(getSelectedSizeStock(), quantity + 1))}
                     disabled={quantity >= getSelectedSizeStock()}
                     className="p-2 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
-                  </button>
+                  </motion.button>
                 </div>
                 <span className="text-sm text-gray-600">
                   {getSelectedSizeStock()} available
@@ -411,12 +457,14 @@ key={sizeData.size}
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-4 sm:flex-row">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleAddToCart}
-                disabled={addingToCart || getSelectedSizeStock() === 0}
-                className="flex items-center justify-center flex-1 px-6 py-3 space-x-2 text-white transition-colors bg-pink-600 rounded-lg hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isAddingToCart || getSelectedSizeStock() === 0}
+                className="flex items-center justify-center flex-1 px-6 py-3 space-x-2 text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {addingToCart ? (
+                {isAddingToCart ? (
                   <div className="w-5 h-5 border-2 border-white rounded-full border-t-transparent animate-spin" />
                 ) : (
                   <>
@@ -424,42 +472,47 @@ key={sizeData.size}
                     <span>Add to Cart</span>
                   </>
                 )}
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleWishlistToggle}
-                className={`px-6 py-3 border-2 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                disabled={isAddingToWishlist || isRemovingFromWishlist}
+                className={`px-6 py-3 border-2 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                   isInWishlist
-                    ? "border-pink-500 bg-pink-50 text-pink-600"
-                    : "border-gray-300 text-gray-700 hover:border-pink-500 hover:text-pink-600"
+                    ? "border-red-500 bg-red-50 text-red-600"
+                    : "border-gray-300 text-gray-700 hover:border-red-500 hover:text-red-600"
                 }`}
               >
                 <Heart className={`w-5 h-5 ${isInWishlist ? "fill-current" : ""}`} />
                 <span>{isInWishlist ? "In Wishlist" : "Add to Wishlist"}</span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleShare}
                 className="flex items-center justify-center px-6 py-3 text-gray-700 transition-colors border-2 border-gray-300 rounded-lg hover:border-gray-400"
               >
                 <Share2 className="w-5 h-5" />
-              </button>
+              </motion.button>
             </div>
 
             {/* Trust Badges */}
             <div className="grid grid-cols-3 gap-4 pt-6 border-t">
               <div className="text-center">
-                <Truck className="w-8 h-8 mx-auto mb-2 text-pink-600" />
+                <Truck className="w-8 h-8 mx-auto mb-2 text-red-600" />
                 <p className="text-sm font-medium text-gray-800">Free Shipping</p>
                 <p className="text-xs text-gray-600">On orders over ₹999</p>
               </div>
               <div className="text-center">
-                <RotateCcw className="w-8 h-8 mx-auto mb-2 text-pink-600" />
+                <RotateCcw className="w-8 h-8 mx-auto mb-2 text-red-600" />
                 <p className="text-sm font-medium text-gray-800">Easy Returns</p>
                 <p className="text-xs text-gray-600">30-day return policy</p>
               </div>
               <div className="text-center">
-                <Shield className="w-8 h-8 mx-auto mb-2 text-pink-600" />
+                <Shield className="w-8 h-8 mx-auto mb-2 text-red-600" />
                 <p className="text-sm font-medium text-gray-800">Secure Payment</p>
                 <p className="text-xs text-gray-600">100% secure checkout</p>
               </div>
@@ -469,8 +522,8 @@ key={sizeData.size}
 
         {/* Product Details Tabs */}
         <div className="mt-16">
-  <ProductReviews productId={currentProduct._id} />
-</div>
+          <ProductReviews productId={currentProduct._id} />
+        </div>
 
         {/* Related Products */}
         <div className="mt-16">
@@ -501,13 +554,11 @@ key={sizeData.size}
               >
                 <X className="w-6 h-6" />
               </button>
-
               <img
                 src={currentProduct.images[selectedImage]?.url || "/placeholder.svg"}
                 alt={currentProduct.name}
                 className="object-contain max-w-full max-h-full"
               />
-
               {currentProduct.images?.length > 1 && (
                 <>
                   <button
@@ -528,7 +579,6 @@ key={sizeData.size}
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   )
 }

@@ -1,24 +1,48 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useSelector, useDispatch } from "react-redux"
-import { useNavigate } from "react-router-dom"
-import { motion } from "framer-motion"
-import { ShoppingBag, MapPin, CreditCard, Tag, Truck, Shield, X } from "lucide-react"
-import { createRazorpayOrder, clearError, clearSuccess } from "../store/slices/orderSlice"
-import { validateCoupon, removeCoupon, clearError as clearCouponError } from "../store/slices/couponSlice"
-import { fetchCart } from "../store/slices/cartSlice"
-import LoadingSpinner from "../components/LoadingSpinner"
-import { verifyPayment } from "../store/slices/paymentSlice" // Import verifyPayment
+import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  ShoppingBag,
+  MapPin,
+  CreditCard,
+  Tag,
+  Truck,
+  Shield,
+  X,
+} from "lucide-react";
+import {
+  createRazorpayOrder,
+  clearError,
+  clearSuccess,
+  placeCodOrder,
+} from "../store/slices/orderSlice";
+import {
+  validateCoupon,
+  removeCoupon,
+  clearError as clearCouponError,
+} from "../store/slices/couponSlice";
+import { fetchCart } from "../store/slices/cartSlice";
+import LoadingSpinner from "../components/LoadingSpinner";
+import { verifyPayment } from "../store/slices/paymentSlice"; // Import verifyPayment
+import { PaymentModal } from "./PaymentModal.jsx";
 
 const CheckoutPage = () => {
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-  const { items: cartItems, summary } = useSelector((state) => state.cart)
-const { razorpayOrder, orderSummary, loading, error, success } = useSelector((state) => state.orders)
-const { appliedCoupon, loading: couponLoading, error: couponError } = useSelector((state) => state.coupons);
-  const { user } = useSelector((state) => state.auth)
+  const { items: cartItems, summary } = useSelector((state) => state.cart);
+  const { razorpayOrder, orderSummary, loading, error, success } = useSelector(
+    (state) => state.orders
+  );
+  const {
+    appliedCoupon,
+    loading: couponLoading,
+    error: couponError,
+  } = useSelector((state) => state.coupons);
+  const { user } = useSelector((state) => state.auth);
 
   const [shippingAddress, setShippingAddress] = useState({
     fullName: user?.name || "",
@@ -29,82 +53,87 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
     state: "",
     pinCode: "",
     landmark: "",
-  })
+  });
 
-  const [couponCode, setCouponCode] = useState("")
-  const [showCouponInput, setShowCouponInput] = useState(false)
-  const [addressErrors, setAddressErrors] = useState({})
-
+  const [couponCode, setCouponCode] = useState("");
+  const [showCouponInput, setShowCouponInput] = useState(false);
+  const [addressErrors, setAddressErrors] = useState({});
+  // At top of component, alongside your other useState calls:
+  const [showModal, setShowModal] = useState(false);
   useEffect(() => {
     if (!cartItems.length) {
-      dispatch(fetchCart())
+      dispatch(fetchCart());
     }
-  }, [dispatch, cartItems.length])
+  }, [dispatch, cartItems.length]);
 
   useEffect(() => {
     if (success.orderCreated && razorpayOrder) {
-      handleRazorpayPayment()
+      handleRazorpayPayment();
     }
-  }, [success.orderCreated, razorpayOrder])
+  }, [success.orderCreated, razorpayOrder]);
 
   useEffect(() => {
     if (error) {
-      setTimeout(() => dispatch(clearError()), 5000)
+      setTimeout(() => dispatch(clearError()), 5000);
     }
-  }, [error, dispatch])
+  }, [error, dispatch]);
 
   useEffect(() => {
     if (couponError) {
-      setTimeout(() => dispatch(clearCouponError()), 5000)
+      setTimeout(() => dispatch(clearCouponError()), 5000);
     }
-  }, [couponError, dispatch])
+  }, [couponError, dispatch]);
 
   const validateAddress = () => {
-    const errors = {}
+    const errors = {};
 
-    if (!shippingAddress.fullName.trim()) errors.fullName = "Full name is required"
-    if (!shippingAddress.phoneNumber.trim()) errors.phoneNumber = "Phone number is required"
+    if (!shippingAddress.fullName.trim())
+      errors.fullName = "Full name is required";
+    if (!shippingAddress.phoneNumber.trim())
+      errors.phoneNumber = "Phone number is required";
     else if (!/^[6789]\d{9}$/.test(shippingAddress.phoneNumber)) {
-      errors.phoneNumber = "Please enter a valid 10-digit mobile number"
+      errors.phoneNumber = "Please enter a valid 10-digit mobile number";
     }
-    if (!shippingAddress.addressLine1.trim()) errors.addressLine1 = "Address is required"
-    if (!shippingAddress.city.trim()) errors.city = "City is required"
-    if (!shippingAddress.state.trim()) errors.state = "State is required"
-    if (!shippingAddress.pinCode.trim()) errors.pinCode = "PIN code is required"
+    if (!shippingAddress.addressLine1.trim())
+      errors.addressLine1 = "Address is required";
+    if (!shippingAddress.city.trim()) errors.city = "City is required";
+    if (!shippingAddress.state.trim()) errors.state = "State is required";
+    if (!shippingAddress.pinCode.trim())
+      errors.pinCode = "PIN code is required";
     else if (!/^[1-9][0-9]{5}$/.test(shippingAddress.pinCode)) {
-      errors.pinCode = "Please enter a valid 6-digit PIN code"
+      errors.pinCode = "Please enter a valid 6-digit PIN code";
     }
 
-    setAddressErrors(errors)
-    return Object.keys(errors).length === 0
-  }
+    setAddressErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleAddressChange = (field, value) => {
-    setShippingAddress((prev) => ({ ...prev, [field]: value }))
+    setShippingAddress((prev) => ({ ...prev, [field]: value }));
     if (addressErrors[field]) {
-      setAddressErrors((prev) => ({ ...prev, [field]: "" }))
+      setAddressErrors((prev) => ({ ...prev, [field]: "" }));
     }
-  }
+  };
 
   const handleApplyCoupon = () => {
-    if (!couponCode.trim()) return
+    if (!couponCode.trim()) return;
 
-    const orderValue = summary.subtotal
-    dispatch(validateCoupon({ code: couponCode, orderValue }))
-  }
+    const orderValue = summary.subtotal;
+    dispatch(validateCoupon({ code: couponCode, orderValue }));
+  };
 
   const handleRemoveCoupon = () => {
-    dispatch(removeCoupon())
-    setCouponCode("")
-    setShowCouponInput(false)
-  }
+    dispatch(removeCoupon());
+    setCouponCode("");
+    setShowCouponInput(false);
+  };
 
   const calculateFinalPricing = () => {
-    const subtotal = summary.subtotal
-    const shippingCharges = subtotal >= 999 ? 0 : 99
-    const discount = appliedCoupon?.discountAmount || 0
-    const tax = Math.round((subtotal - discount) * 0.18) // 18% GST
-    const total = subtotal + shippingCharges + tax - discount
+    const subtotal = summary.subtotal;
+    const shippingCharges = subtotal >= 999 ? 0 : 99;
+    const discount = appliedCoupon?.discountAmount || 0;
+    const tax = Math.round((subtotal - discount) * 0.18); // 18% GST
+    const total = subtotal + shippingCharges + tax - discount;
 
     return {
       subtotal,
@@ -112,19 +141,19 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
       tax,
       discount,
       total,
-    }
-  }
+    };
+  };
 
-  const pricing = calculateFinalPricing()
+  const pricing = calculateFinalPricing();
 
   const handlePlaceOrder = () => {
     if (!validateAddress()) {
-      return
+      return;
     }
 
     if (!cartItems.length) {
-      alert("Your cart is empty")
-      return
+      alert("Your cart is empty");
+      return;
     }
 
     const orderData = {
@@ -139,14 +168,41 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
         phoneNumber: `+91${shippingAddress.phoneNumber}`,
       },
       couponCode: appliedCoupon?.code || "",
+    };
+
+    dispatch(createRazorpayOrder(orderData));
+  };
+
+  const handlePlaceCodOrder = () => {
+    if (!validateAddress()) {
+      return;
     }
 
-    dispatch(createRazorpayOrder(orderData))
-  }
+    if (!cartItems.length) {
+      alert("Your cart is empty");
+      return;
+    }
+
+    const orderData = {
+      items: cartItems.map((item) => ({
+        productId: item.product._id,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color,
+      })),
+      shippingAddress: {
+        ...shippingAddress,
+        phoneNumber: `+91${shippingAddress.phoneNumber}`,
+      },
+      couponCode: appliedCoupon?.code || "",
+    };
+
+    dispatch(placeCodOrder(orderData));
+  };
 
   const handleRazorpayPayment = () => {
     const options = {
-    key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
       amount: razorpayOrder.amount,
       currency: razorpayOrder.currency,
       name: "FashionHub",
@@ -159,12 +215,12 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
-          }),
+          })
         ).then((result) => {
           if (result.type === "order/verifyPayment/fulfilled") {
-            navigate(`/order-confirmation/${result.payload.order.id}`)
+            navigate(`/order-confirmation/${result.payload.order.id}`);
           }
-        })
+        });
       },
       prefill: {
         name: shippingAddress.fullName,
@@ -176,22 +232,26 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
       },
       modal: {
         ondismiss: () => {
-          dispatch(clearSuccess())
+          dispatch(clearSuccess());
         },
       },
-    }
+    };
 
-    const rzp = new window.Razorpay(options)
-    rzp.open()
-  }
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
 
   if (!cartItems.length && !loading.creating) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-          <h2 className="mb-2 text-2xl font-bold text-gray-800">Your cart is empty</h2>
-          <p className="mb-4 text-gray-600">Add some items to your cart to proceed with checkout</p>
+          <h2 className="mb-2 text-2xl font-bold text-gray-800">
+            Your cart is empty
+          </h2>
+          <p className="mb-4 text-gray-600">
+            Add some items to your cart to proceed with checkout
+          </p>
           <button
             onClick={() => navigate("/")}
             className="px-6 py-2 text-white transition-colors bg-pink-600 rounded-lg hover:bg-pink-700"
@@ -200,17 +260,23 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="min-h-screen py-8 bg-gray-50">
       <div className="container px-4 mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-6xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-6xl mx-auto"
+        >
           {/* Header */}
           <div className="mb-8">
             <h1 className="mb-2 text-3xl font-bold text-gray-800">Checkout</h1>
-            <p className="text-gray-600">Review your order and complete your purchase</p>
+            <p className="text-gray-600">
+              Review your order and complete your purchase
+            </p>
           </div>
 
           {/* Error Display */}
@@ -240,21 +306,33 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">Full Name *</label>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Full Name *
+                    </label>
                     <input
                       type="text"
                       value={shippingAddress.fullName}
-                      onChange={(e) => handleAddressChange("fullName", e.target.value)}
+                      onChange={(e) =>
+                        handleAddressChange("fullName", e.target.value)
+                      }
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.fullName ? "border-red-500" : "border-gray-300"
+                        addressErrors.fullName
+                          ? "border-red-500"
+                          : "border-gray-300"
                       }`}
                       placeholder="Enter your full name"
                     />
-                    {addressErrors.fullName && <p className="mt-1 text-sm text-red-500">{addressErrors.fullName}</p>}
+                    {addressErrors.fullName && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {addressErrors.fullName}
+                      </p>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">Phone Number *</label>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Phone Number *
+                    </label>
                     <div className="flex">
                       <span className="inline-flex items-center px-3 text-gray-500 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50">
                         +91
@@ -263,94 +341,150 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
                         type="tel"
                         value={shippingAddress.phoneNumber}
                         onChange={(e) =>
-                          handleAddressChange("phoneNumber", e.target.value.replace(/\D/g, "").slice(0, 10))
+                          handleAddressChange(
+                            "phoneNumber",
+                            e.target.value.replace(/\D/g, "").slice(0, 10)
+                          )
                         }
                         className={`w-full px-3 py-2 border rounded-r-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                          addressErrors.phoneNumber ? "border-red-500" : "border-gray-300"
+                          addressErrors.phoneNumber
+                            ? "border-red-500"
+                            : "border-gray-300"
                         }`}
                         placeholder="Enter 10-digit mobile number"
                       />
                     </div>
                     {addressErrors.phoneNumber && (
-                      <p className="mt-1 text-sm text-red-500">{addressErrors.phoneNumber}</p>
+                      <p className="mt-1 text-sm text-red-500">
+                        {addressErrors.phoneNumber}
+                      </p>
                     )}
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block mb-1 text-sm font-medium text-gray-700">Address Line 1 *</label>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Address Line 1 *
+                    </label>
                     <input
                       type="text"
                       value={shippingAddress.addressLine1}
-                      onChange={(e) => handleAddressChange("addressLine1", e.target.value)}
+                      onChange={(e) =>
+                        handleAddressChange("addressLine1", e.target.value)
+                      }
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.addressLine1 ? "border-red-500" : "border-gray-300"
+                        addressErrors.addressLine1
+                          ? "border-red-500"
+                          : "border-gray-300"
                       }`}
                       placeholder="House/Flat No., Building Name, Street"
                     />
                     {addressErrors.addressLine1 && (
-                      <p className="mt-1 text-sm text-red-500">{addressErrors.addressLine1}</p>
+                      <p className="mt-1 text-sm text-red-500">
+                        {addressErrors.addressLine1}
+                      </p>
                     )}
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block mb-1 text-sm font-medium text-gray-700">Address Line 2</label>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Address Line 2
+                    </label>
                     <input
                       type="text"
                       value={shippingAddress.addressLine2}
-                      onChange={(e) => handleAddressChange("addressLine2", e.target.value)}
+                      onChange={(e) =>
+                        handleAddressChange("addressLine2", e.target.value)
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
                       placeholder="Area, Locality (Optional)"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">City *</label>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      City *
+                    </label>
                     <input
                       type="text"
                       value={shippingAddress.city}
-                      onChange={(e) => handleAddressChange("city", e.target.value)}
+                      onChange={(e) =>
+                        handleAddressChange("city", e.target.value)
+                      }
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.city ? "border-red-500" : "border-gray-300"
+                        addressErrors.city
+                          ? "border-red-500"
+                          : "border-gray-300"
                       }`}
                       placeholder="Enter your city"
                     />
-                    {addressErrors.city && <p className="mt-1 text-sm text-red-500">{addressErrors.city}</p>}
+                    {addressErrors.city && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {addressErrors.city}
+                      </p>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">State *</label>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      State *
+                    </label>
                     <input
                       type="text"
                       value={shippingAddress.state}
-                      onChange={(e) => handleAddressChange("state", e.target.value)}
+                      onChange={(e) =>
+                        handleAddressChange("state", e.target.value)
+                      }
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.state ? "border-red-500" : "border-gray-300"
+                        addressErrors.state
+                          ? "border-red-500"
+                          : "border-gray-300"
                       }`}
                       placeholder="Enter your state"
                     />
-                    {addressErrors.state && <p className="mt-1 text-sm text-red-500">{addressErrors.state}</p>}
+                    {addressErrors.state && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {addressErrors.state}
+                      </p>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">PIN Code *</label>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      PIN Code *
+                    </label>
                     <input
                       type="text"
                       value={shippingAddress.pinCode}
-                      onChange={(e) => handleAddressChange("pinCode", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      onChange={(e) =>
+                        handleAddressChange(
+                          "pinCode",
+                          e.target.value.replace(/\D/g, "").slice(0, 6)
+                        )
+                      }
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.pinCode ? "border-red-500" : "border-gray-300"
+                        addressErrors.pinCode
+                          ? "border-red-500"
+                          : "border-gray-300"
                       }`}
                       placeholder="Enter 6-digit PIN code"
                     />
-                    {addressErrors.pinCode && <p className="mt-1 text-sm text-red-500">{addressErrors.pinCode}</p>}
+                    {addressErrors.pinCode && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {addressErrors.pinCode}
+                      </p>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">Landmark</label>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      Landmark
+                    </label>
                     <input
                       type="text"
                       value={shippingAddress.landmark}
-                      onChange={(e) => handleAddressChange("landmark", e.target.value)}
+                      onChange={(e) =>
+                        handleAddressChange("landmark", e.target.value)
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
                       placeholder="Nearby landmark (Optional)"
                     />
@@ -373,10 +507,17 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
                 {appliedCoupon ? (
                   <div className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50">
                     <div>
-                      <p className="font-medium text-green-800">{appliedCoupon.code}</p>
-                      <p className="text-sm text-green-600">You saved ₹{appliedCoupon.discountAmount}!</p>
+                      <p className="font-medium text-green-800">
+                        {appliedCoupon.code}
+                      </p>
+                      <p className="text-sm text-green-600">
+                        You saved ₹{appliedCoupon.discountAmount}!
+                      </p>
                     </div>
-                    <button onClick={handleRemoveCoupon} className="p-1 text-red-500 hover:text-red-700">
+                    <button
+                      onClick={handleRemoveCoupon}
+                      className="p-1 text-red-500 hover:text-red-700"
+                    >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -394,21 +535,25 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
                         <input
                           type="text"
                           value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          onChange={(e) =>
+                            setCouponCode(e.target.value.toUpperCase())
+                          }
                           placeholder="Enter promo code"
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
                         />
                         <button
                           onClick={handleApplyCoupon}
-                          disabled={!couponCode.trim() || couponLoading.validating}
+                          disabled={
+                            !couponCode.trim() || couponLoading.validating
+                          }
                           className="px-4 py-2 text-white bg-pink-600 rounded-lg hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {couponLoading.validating ? "Applying..." : "Apply"}
                         </button>
                         <button
                           onClick={() => {
-                            setShowCouponInput(false)
-                            setCouponCode("")
+                            setShowCouponInput(false);
+                            setCouponCode("");
                           }}
                           className="px-2 text-gray-500 hover:text-gray-700"
                         >
@@ -433,18 +578,25 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
                 {/* Cart Items */}
                 <div className="mb-6 space-y-4">
                   {cartItems.map((item) => (
-                    <div key={`${item.product._id}-${item.size}`} className="flex items-center space-x-3">
+                    <div
+                      key={`${item.product._id}-${item.size}`}
+                      className="flex items-center space-x-3"
+                    >
                       <img
                         src={item.product.images[0] || "/placeholder.svg"}
                         alt={item.product.name}
                         className="object-cover w-16 h-16 rounded-lg"
                       />
                       <div className="flex-1">
-                        <h3 className="text-sm font-medium">{item.product.name}</h3>
+                        <h3 className="text-sm font-medium">
+                          {item.product.name}
+                        </h3>
                         <p className="text-sm text-gray-600">
                           Size: {item.size} | Qty: {item.quantity}
                         </p>
-                        <p className="text-sm font-semibold">₹{item.product.price}</p>
+                        <p className="text-sm font-semibold">
+                          ₹{item.product.price}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -459,8 +611,14 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
 
                   <div className="flex justify-between text-sm">
                     <span>Shipping</span>
-                    <span className={pricing.shippingCharges === 0 ? "text-green-600" : ""}>
-                      {pricing.shippingCharges === 0 ? "FREE" : `₹${pricing.shippingCharges}`}
+                    <span
+                      className={
+                        pricing.shippingCharges === 0 ? "text-green-600" : ""
+                      }
+                    >
+                      {pricing.shippingCharges === 0
+                        ? "FREE"
+                        : `₹${pricing.shippingCharges}`}
                     </span>
                   </div>
 
@@ -497,7 +655,8 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
 
                 {/* Place Order Button */}
                 <button
-                  onClick={handlePlaceOrder}
+                  //onClick={handlePlaceOrder}
+                  onClick={() => setShowModal(true)}
                   disabled={loading.creating || !cartItems.length}
                   className="flex items-center justify-center w-full py-3 mt-6 font-semibold text-white bg-pink-600 rounded-lg hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -521,9 +680,20 @@ const { appliedCoupon, loading: couponLoading, error: couponError } = useSelecto
             </div>
           </div>
         </motion.div>
+        <PaymentModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          onOnline={handlePlaceOrder}
+          onCOD={() => {
+            handlePlaceCodOrder();
+            alert("✅ COD order placed!");
+            navigate("/orders");
+          }}
+          amount={pricing.total}
+        />
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default CheckoutPage
+export default CheckoutPage;
