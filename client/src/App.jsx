@@ -179,7 +179,6 @@ function App() {
                 }
               />
 
-              {/* 404 Route */}
               <Route
                 path="*"
                 element={

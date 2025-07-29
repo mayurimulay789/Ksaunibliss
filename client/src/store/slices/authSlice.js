@@ -215,6 +215,7 @@ export const loginWithEmail = createAsyncThunk(
       localStorage.setItem("fashionhub_token", response.data.jwtToken)
 
       return {
+        
         firebaseUser: {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
