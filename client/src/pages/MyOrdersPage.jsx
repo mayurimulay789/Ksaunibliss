@@ -12,7 +12,7 @@ const MyOrdersPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
-const { orders, pagination, loading, error } = useSelector((state) => state.orders) || {}
+  const { orders, pagination, loading, error } = useSelector((state) => state.orders) || {}
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [cancelReason, setCancelReason] = useState("")
@@ -20,6 +20,8 @@ const { orders, pagination, loading, error } = useSelector((state) => state.orde
 
   useEffect(() => {
     dispatch(fetchUserOrders({ page: currentPage, limit: 10 }))
+    console.log("Image URL:", orders[0]?.items?.[0]?.product?.images?.[0]?.url);
+
   }, [dispatch, currentPage])
 
   useEffect(() => {
@@ -189,11 +191,16 @@ const { orders, pagination, loading, error } = useSelector((state) => state.orde
                       {order.items.slice(0, 3).map((item, itemIndex) => (
                         <img
                           key={itemIndex}
-                          src={item.image || "/placeholder.svg"}
-                          alt={item.name}
+                          src={
+                            item?.product?.images?.[0]?.url || "/placeholder.svg"
+                          }
+                          alt={item?.product?.name || "Product"}
                           className="object-cover w-16 h-16 rounded-lg"
                         />
                       ))}
+
+
+
                       {order.items.length > 3 && (
                         <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded-lg">
                           <span className="text-sm text-gray-600">+{order.items.length - 3}</span>
@@ -256,11 +263,10 @@ const { orders, pagination, loading, error } = useSelector((state) => state.orde
                   <button
                     key={page}
                     onClick={() => handlePageChange(page)}
-                    className={`px-4 py-2 border rounded-lg ${
-                      page === currentPage
+                    className={`px-4 py-2 border rounded-lg ${page === currentPage
                         ? "bg-pink-600 text-white border-pink-600"
                         : "border-gray-300 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {page}
                   </button>

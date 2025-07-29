@@ -315,11 +315,10 @@ const CheckoutPage = () => {
                       onChange={(e) =>
                         handleAddressChange("fullName", e.target.value)
                       }
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.fullName
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${addressErrors.fullName
                           ? "border-red-500"
                           : "border-gray-300"
-                      }`}
+                        }`}
                       placeholder="Enter your full name"
                     />
                     {addressErrors.fullName && (
@@ -346,11 +345,10 @@ const CheckoutPage = () => {
                             e.target.value.replace(/\D/g, "").slice(0, 10)
                           )
                         }
-                        className={`w-full px-3 py-2 border rounded-r-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                          addressErrors.phoneNumber
+                        className={`w-full px-3 py-2 border rounded-r-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${addressErrors.phoneNumber
                             ? "border-red-500"
                             : "border-gray-300"
-                        }`}
+                          }`}
                         placeholder="Enter 10-digit mobile number"
                       />
                     </div>
@@ -371,11 +369,10 @@ const CheckoutPage = () => {
                       onChange={(e) =>
                         handleAddressChange("addressLine1", e.target.value)
                       }
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.addressLine1
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${addressErrors.addressLine1
                           ? "border-red-500"
                           : "border-gray-300"
-                      }`}
+                        }`}
                       placeholder="House/Flat No., Building Name, Street"
                     />
                     {addressErrors.addressLine1 && (
@@ -410,11 +407,10 @@ const CheckoutPage = () => {
                       onChange={(e) =>
                         handleAddressChange("city", e.target.value)
                       }
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.city
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${addressErrors.city
                           ? "border-red-500"
                           : "border-gray-300"
-                      }`}
+                        }`}
                       placeholder="Enter your city"
                     />
                     {addressErrors.city && (
@@ -434,11 +430,10 @@ const CheckoutPage = () => {
                       onChange={(e) =>
                         handleAddressChange("state", e.target.value)
                       }
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.state
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${addressErrors.state
                           ? "border-red-500"
                           : "border-gray-300"
-                      }`}
+                        }`}
                       placeholder="Enter your state"
                     />
                     {addressErrors.state && (
@@ -461,11 +456,10 @@ const CheckoutPage = () => {
                           e.target.value.replace(/\D/g, "").slice(0, 6)
                         )
                       }
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${
-                        addressErrors.pinCode
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 ${addressErrors.pinCode
                           ? "border-red-500"
                           : "border-gray-300"
-                      }`}
+                        }`}
                       placeholder="Enter 6-digit PIN code"
                     />
                     {addressErrors.pinCode && (
@@ -576,6 +570,7 @@ const CheckoutPage = () => {
                 <h2 className="mb-4 text-xl font-semibold">Order Summary</h2>
 
                 {/* Cart Items */}
+
                 <div className="mb-6 space-y-4">
                   {cartItems.map((item) => (
                     <div
@@ -583,10 +578,11 @@ const CheckoutPage = () => {
                       className="flex items-center space-x-3"
                     >
                       <img
-                        src={item.product.images[0] || "/placeholder.svg"}
+                        src={item.product.images?.[0]?.url || "/placeholder.svg"}
                         alt={item.product.name}
                         className="object-cover w-16 h-16 rounded-lg"
                       />
+
                       <div className="flex-1">
                         <h3 className="text-sm font-medium">
                           {item.product.name}
