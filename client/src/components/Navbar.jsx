@@ -239,7 +239,7 @@ const Navbar = () => {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-white border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto"
+                    className="absolute left-0 right-0 z-50 mt-2 overflow-y-auto bg-white border rounded-lg shadow-lg top-full max-h-80"
                   >
                     {/* Recent Searches */}
                     {recentSearches.length > 0 && !searchQuery && (
@@ -257,7 +257,7 @@ const Navbar = () => {
                           {recentSearches.map((search, index) => (
                             <div
                               key={index}
-                              className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer"
+                              className="flex items-center justify-between p-2 rounded cursor-pointer hover:bg-gray-50"
                               onClick={() => handleRecentSearchClick(search)}
                             >
                               <div className="flex items-center space-x-2">
@@ -288,11 +288,11 @@ const Navbar = () => {
                           </div>
                         ) : suggestions.length > 0 ? (
                           <div className="space-y-2">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3">Suggestions</h4>
+                            <h4 className="mb-3 text-sm font-medium text-gray-700">Suggestions</h4>
                             {suggestions.map((suggestion, index) => (
                               <div
                                 key={index}
-                                className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                                className="flex items-center p-2 space-x-2 rounded cursor-pointer hover:bg-gray-50"
                                 onClick={() => handleSuggestionClick(suggestion)}
                               >
                                 <Search className="w-4 h-4 text-gray-400" />
@@ -301,7 +301,7 @@ const Navbar = () => {
                             ))}
                           </div>
                         ) : (
-                          <div className="py-4 text-center text-sm text-gray-500">No suggestions found</div>
+                          <div className="py-4 text-sm text-center text-gray-500">No suggestions found</div>
                         )}
                       </div>
                     )}
@@ -421,7 +421,7 @@ const Navbar = () => {
                 )}
               </AnimatePresence>
             </div>
-
+{/* added data  */}
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 md:hidden">
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
